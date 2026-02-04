@@ -6,15 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-  body { margin: 0; background: #0f0f0f; color: white; font-family: Arial, sans-serif; text-align: center; }
-  canvas { background: #000; border: 3px solid #00ff66; margin-top: 5px; }
-  .hidden { display: none; }
-  .score { font-size: 18px; margin: 4px 0; }
-  .best { color: gold; transition: transform 0.2s; }
-  .best.flash { animation: bestFlash 0.4s ease; }
-  @keyframes bestFlash { 0% { transform: scale(1); color: gold; } 50% { transform: scale(1.3); color: #fff176; } 100% { transform: scale(1); color: gold; } }
-  .score-pop { position: absolute; color: #00ff66; font-weight: bold; pointer-events: none; animation: pop 0.6s ease-out forwards; }
-  @keyframes pop { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-25px) scale(1.4); } }
+body { margin: 0; background: #0f0f0f; color: white; font-family: Arial, sans-serif; text-align: center; }
+canvas { background: #000; border: 3px solid #00ff66; margin-top: 5px; }
+.hidden { display: none; }
+.score { font-size: 18px; margin: 4px 0; }
+.best { color: gold; transition: transform 0.2s; }
+.best.flash { animation: bestFlash 0.4s ease; }
+@keyframes bestFlash { 0% { transform: scale(1); color: gold; } 50% { transform: scale(1.3); color: #fff176; } 100% { transform: scale(1); color: gold; } }
+.score-pop { position: absolute; color: #00ff66; font-weight: bold; pointer-events: none; animation: pop 0.6s ease-out forwards; }
+@keyframes pop { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-25px) scale(1.4); } }
+#chatBox { height:200px; overflow-y:auto; background:#111; border:2px solid #00ff66; padding:5px; margin: 10px auto; width:90%; max-width:400px; text-align:left; }
+#chatInput { width:65%; padding:5px; }
+button { padding:5px 10px; cursor:pointer; }
 </style>
 </head>
 
@@ -45,28 +48,32 @@
 
   <h3>🏆 Leaderboard</h3>
   <ol id="leaderboard"></ol>
+
+  <h3>💬 Global Chat</h3>
+  <div id="chatBox"></div>
+  <input id="chatInput" placeholder="Type a message...">
+  <button onclick="sendMessage()">Send</button>
 </div>
 
 <!-- Firebase -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyB4VdMiIZIjQahzDEMRa_obzQf1bAm-6TI",
-    authDomain: "snake-global-leaderboard.firebaseapp.com",
-    projectId: "snake-global-leaderboard",
-    storageBucket: "snake-global-leaderboard.firebasestorage.app",
-    messagingSenderId: "931881309923",
-    appId: "1:931881309923:web:43de09e6cd566b3e2a97d6",
-    measurementId: "G-883P0X3S65"
-  };
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyB4VdMiIZIjQahzDEMRa_obzQf1bAm-6TI",
+  authDomain: "snake-global-leaderboard.firebaseapp.com",
+  projectId: "snake-global-leaderboard",
+  storageBucket: "snake-global-leaderboard.firebasestorage.app",
+  messagingSenderId: "931881309923",
+  appId: "1:931881309923:web:43de09e6cd566b3e2a97d6",
+  measurementId: "G-883P0X3S65"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-</script>
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-<script>
 /* ---------- STORAGE ---------- */
 const USER_KEY = "snake_username";
 let username = localStorage.getItem(USER_KEY);
@@ -84,29 +91,54 @@ let nextDirection = "RIGHT";
 let loop = null;
 let alive = true;
 
+/* ---------- DOM ELEMENTS ---------- */
+const chatBox = document.getElementById("chatBox");
+const chatInput = document.getElementById("chatInput");
+
 /* ---------- FIRESTORE FUNCTIONS ---------- */
 async function saveScore(username, score) {
   try {
-    const docRef = await addDoc(collection(db, "scores"), { username, score, timestamp: Date.now() });
-    console.log("Score saved:", docRef.id);
-  } catch (e) {
-    console.error("Error adding score:", e);
-  }
+    await addDoc(collection(db, "scores"), { username, score, timestamp: Date.now() });
+  } catch (e) { console.error("Error adding score:", e); }
 }
 
 async function fetchTopScores() {
   const board = document.getElementById("leaderboard");
   board.innerHTML = "";
-
   const q = query(collection(db, "scores"), orderBy("score", "desc"), limit(10));
   const querySnapshot = await getDocs(q);
-
   querySnapshot.forEach(doc => {
+    const data = doc.data();
     const li = document.createElement("li");
-    li.textContent = `${doc.data().username}: ${doc.data().score}`;
+    li.textContent = `${data.username}: ${data.score}`;
     board.appendChild(li);
   });
 }
+
+/* ---------- CHAT ---------- */
+function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text || !username) return;
+  addDoc(collection(db, "chatMessages"), {
+    username,
+    message: text,
+    timestamp: Date.now()
+  });
+  chatInput.value = "";
+}
+
+// Listen to latest 50 messages
+const chatQuery = query(collection(db, "chatMessages"), orderBy("timestamp", "asc"), limit(50));
+onSnapshot(chatQuery, snapshot => {
+  chatBox.innerHTML = "";
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    const div = document.createElement("div");
+    div.textContent = `${data.username}: ${data.message}`;
+    chatBox.appendChild(div);
+  });
+  chatBox.scrollTop = chatBox.scrollHeight;
+});
 
 /* ---------- USERNAME ---------- */
 function saveUsername() {
@@ -123,10 +155,10 @@ function startGame() {
   document.getElementById("usernameScreen").classList.add("hidden");
   document.getElementById("gameScreen").classList.remove("hidden");
   document.getElementById("playerName").textContent = username;
-
   document.getElementById("bestDisplay").textContent = bestLocal || 0;
+
   resetGame();
-  fetchTopScores(); // show leaderboard
+  fetchTopScores();
 }
 
 /* ---------- RESET / RESPAWN ---------- */
@@ -151,14 +183,11 @@ function resetGame() {
 }
 
 /* ---------- FOOD ---------- */
-function spawnFood() {
-  return { x: Math.floor(Math.random() * 20) * box, y: Math.floor(Math.random() * 20) * box };
-}
+function spawnFood() { return { x: Math.floor(Math.random() * 20) * box, y: Math.floor(Math.random() * 20) * box }; }
 
 /* ---------- INPUT ---------- */
 document.addEventListener("keydown", e => {
   if (!alive && e.code === "Space") resetGame();
-
   if (e.key === "ArrowLeft"  && direction !== "RIGHT") nextDirection = "LEFT";
   if (e.key === "ArrowUp"    && direction !== "DOWN")  nextDirection = "UP";
   if (e.key === "ArrowRight" && direction !== "LEFT")  nextDirection = "RIGHT";
@@ -168,7 +197,6 @@ document.addEventListener("keydown", e => {
 /* ---------- DRAW ---------- */
 function draw() {
   direction = nextDirection;
-
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
