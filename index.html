@@ -191,7 +191,7 @@ let alive = true;
 
 const OWNER_USERNAME = "PatronMo";
 
-// Functions
+// Snake
 function spawnFood(){ return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
 function scorePop(x,y){ const pop=document.createElement("div"); pop.className="score-pop"; pop.textContent="+1"; pop.style.left=canvas.offsetLeft+x+"px"; pop.style.top=canvas.offsetTop+y+"px"; document.body.appendChild(pop); setTimeout(()=>pop.remove(),600); }
 function showAnnouncement(msg){ announcementPopup.textContent=msg; announcementPopup.style.display="block"; setTimeout(()=>announcementPopup.style.display="none",3000); }
@@ -208,7 +208,7 @@ async function saveUsername(){
   startGame();
 }
 
-// Owner panel toggle
+// Owner toggle
 ownerToggleBtn.addEventListener("click",()=>{
   if(ownerPanel.style.display==="block"){ ownerPanel.style.display="none"; }
   else{ if(username===OWNER_USERNAME) ownerPanel.style.display="block"; else alert("Only PatronMo can open owner panel"); }
@@ -221,8 +221,11 @@ async function sendMessage(){
   chatInput.value=""; chatInput.focus();
 }
 chatSendBtn.addEventListener("click",sendMessage);
-chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"){ e.preventDefault(); sendMessage();}});
+chatInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){ e.preventDefault(); sendMessage(); }
+});
 
+// Chat realtime
 const chatQuery=query(collection(db,"chatMessages"),orderBy("timestamp","desc"),limit(50));
 onSnapshot(chatQuery,snapshot=>{
   const messages=[];
@@ -238,7 +241,7 @@ onSnapshot(chatQuery,snapshot=>{
   chatBox.scrollTop=chatBox.scrollHeight;
 });
 
-// Leaderboard fix
+// Leaderboard
 async function fetchTopScores(){
   leaderboard.innerHTML="";
   const scoresSnapshot = await getDocs(collection(db,"scores"));
@@ -272,14 +275,27 @@ function startGame(){
   fetchTopScores();
 }
 
+// Snake movement with arrow keys + WASD, only prevent default outside inputs
 document.addEventListener("keydown",e=>{
-  if(["ArrowLeft","ArrowUp","ArrowRight","ArrowDown"," "].includes(e.key)) e.preventDefault();
-  if(!alive && e.code==="Space") resetGame();
-  if(e.key==="ArrowLeft" && direction!=="RIGHT") nextDirection="LEFT";
-  if(e.key==="ArrowRight" && direction!=="LEFT") nextDirection="RIGHT";
-  if(e.key==="ArrowUp" && direction!=="DOWN") nextDirection="UP";
-  if(e.key==="ArrowDown" && direction!=="UP") nextDirection="DOWN";
+  const tag = document.activeElement.tagName.toLowerCase();
+  const key = e.key.toLowerCase();
+
+  // Only prevent scrolling if not typing in input
+  if(tag!=="input" && ["arrowleft","arrowup","arrowright","arrowdown"," ","w","a","s","d"].includes(key)) e.preventDefault();
+
+  if(!alive && e.code==="Space" && tag!=="input") resetGame();
+
+  if(key==="arrowleft" && direction!=="RIGHT") nextDirection="LEFT";
+  if(key==="arrowright" && direction!=="LEFT") nextDirection="RIGHT";
+  if(key==="arrowup" && direction!=="DOWN") nextDirection="UP";
+  if(key==="arrowdown" && direction!=="UP") nextDirection="DOWN";
+
+  if(key==="a" && direction!=="RIGHT") nextDirection="LEFT";
+  if(key==="d" && direction!=="LEFT") nextDirection="RIGHT";
+  if(key==="w" && direction!=="DOWN") nextDirection="UP";
+  if(key==="s" && direction!=="UP") nextDirection="DOWN";
 });
+
 function draw(){
   direction=nextDirection;
   ctx.fillStyle="black"; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -296,6 +312,7 @@ function draw(){
   }else snake.pop();
   snake.unshift(head);
 }
+
 async function gameOver(){
   alive=false; 
   clearInterval(loop);
