@@ -6,54 +6,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-  body {
-    margin: 0;
-    background: #0f0f0f;
-    color: white;
-    font-family: Arial, sans-serif;
-    text-align: center;
-  }
-
-  canvas {
-    background: #000;
-    border: 3px solid #00ff66;
-    margin-top: 5px;
-  }
-
+  body { margin: 0; background: #0f0f0f; color: white; font-family: Arial, sans-serif; text-align: center; }
+  canvas { background: #000; border: 3px solid #00ff66; margin-top: 5px; }
   .hidden { display: none; }
-
-  .score {
-    font-size: 18px;
-    margin: 4px 0;
-  }
-
-  .best {
-    color: gold;
-    transition: transform 0.2s;
-  }
-
-  .best.flash {
-    animation: bestFlash 0.4s ease;
-  }
-
-  @keyframes bestFlash {
-    0%   { transform: scale(1); color: gold; }
-    50%  { transform: scale(1.3); color: #fff176; }
-    100% { transform: scale(1); color: gold; }
-  }
-
-  .score-pop {
-    position: absolute;
-    color: #00ff66;
-    font-weight: bold;
-    pointer-events: none;
-    animation: pop 0.6s ease-out forwards;
-  }
-
-  @keyframes pop {
-    0%   { opacity: 1; transform: translateY(0) scale(1); }
-    100% { opacity: 0; transform: translateY(-25px) scale(1.4); }
-  }
+  .score { font-size: 18px; margin: 4px 0; }
+  .best { color: gold; transition: transform 0.2s; }
+  .best.flash { animation: bestFlash 0.4s ease; }
+  @keyframes bestFlash { 0% { transform: scale(1); color: gold; } 50% { transform: scale(1.3); color: #fff176; } 100% { transform: scale(1); color: gold; } }
+  .score-pop { position: absolute; color: #00ff66; font-weight: bold; pointer-events: none; animation: pop 0.6s ease-out forwards; }
+  @keyframes pop { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-25px) scale(1.4); } }
 </style>
 </head>
 
@@ -86,13 +47,30 @@
   <ol id="leaderboard"></ol>
 </div>
 
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB4VdMiIZIjQahzDEMRa_obzQf1bAm-6TI",
+    authDomain: "snake-global-leaderboard.firebaseapp.com",
+    projectId: "snake-global-leaderboard",
+    storageBucket: "snake-global-leaderboard.firebasestorage.app",
+    messagingSenderId: "931881309923",
+    appId: "1:931881309923:web:43de09e6cd566b3e2a97d6",
+    measurementId: "G-883P0X3S65"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+</script>
+
 <script>
 /* ---------- STORAGE ---------- */
 const USER_KEY = "snake_username";
-const SCORE_KEY = "snake_scores";
-
 let username = localStorage.getItem(USER_KEY);
-let scores = JSON.parse(localStorage.getItem(SCORE_KEY)) || {};
+let bestLocal = 0;
 
 /* ---------- CANVAS ---------- */
 const canvas = document.getElementById("game");
@@ -106,11 +84,34 @@ let nextDirection = "RIGHT";
 let loop = null;
 let alive = true;
 
+/* ---------- FIRESTORE FUNCTIONS ---------- */
+async function saveScore(username, score) {
+  try {
+    const docRef = await addDoc(collection(db, "scores"), { username, score, timestamp: Date.now() });
+    console.log("Score saved:", docRef.id);
+  } catch (e) {
+    console.error("Error adding score:", e);
+  }
+}
+
+async function fetchTopScores() {
+  const board = document.getElementById("leaderboard");
+  board.innerHTML = "";
+
+  const q = query(collection(db, "scores"), orderBy("score", "desc"), limit(10));
+  const querySnapshot = await getDocs(q);
+
+  querySnapshot.forEach(doc => {
+    const li = document.createElement("li");
+    li.textContent = `${doc.data().username}: ${doc.data().score}`;
+    board.appendChild(li);
+  });
+}
+
 /* ---------- USERNAME ---------- */
 function saveUsername() {
   const input = document.getElementById("usernameInput").value.trim();
   if (!input) return alert("Enter a username");
-  if (scores[input]) return alert("Username already exists");
 
   localStorage.setItem(USER_KEY, input);
   username = input;
@@ -123,8 +124,9 @@ function startGame() {
   document.getElementById("gameScreen").classList.remove("hidden");
   document.getElementById("playerName").textContent = username;
 
-  document.getElementById("bestDisplay").textContent = scores[username] || 0;
+  document.getElementById("bestDisplay").textContent = bestLocal || 0;
   resetGame();
+  fetchTopScores(); // show leaderboard
 }
 
 /* ---------- RESET / RESPAWN ---------- */
@@ -145,16 +147,12 @@ function resetGame() {
   document.getElementById("deathText").classList.add("hidden");
 
   clearInterval(loop);
-  loop = setInterval(draw, 70); // smooth
-  updateLeaderboard();
+  loop = setInterval(draw, 70);
 }
 
 /* ---------- FOOD ---------- */
 function spawnFood() {
-  return {
-    x: Math.floor(Math.random() * 20) * box,
-    y: Math.floor(Math.random() * 20) * box
-  };
+  return { x: Math.floor(Math.random() * 20) * box, y: Math.floor(Math.random() * 20) * box };
 }
 
 /* ---------- INPUT ---------- */
@@ -183,30 +181,24 @@ function draw() {
   ctx.fillRect(food.x, food.y, box, box);
 
   let head = { ...snake[0] };
-
   if (direction === "LEFT") head.x -= box;
   if (direction === "RIGHT") head.x += box;
   if (direction === "UP") head.y -= box;
   if (direction === "DOWN") head.y += box;
 
-  if (
-    head.x < 0 || head.y < 0 ||
-    head.x >= canvas.width || head.y >= canvas.height ||
-    snake.some(s => s.x === head.x && s.y === head.y)
-  ) {
-    return gameOver();
-  }
+  if (head.x < 0 || head.y < 0 || head.x >= canvas.width || head.y >= canvas.height ||
+      snake.some(s => s.x === head.x && s.y === head.y)) return gameOver();
 
   if (head.x === food.x && head.y === food.y) {
     score++;
     document.getElementById("scoreDisplay").textContent = score;
     scorePop(head.x, head.y);
 
-    if (score > (scores[username] || 0)) {
+    if (score > bestLocal) {
+      bestLocal = score;
       document.getElementById("bestDisplay").textContent = score;
       document.getElementById("bestDisplay").classList.add("flash");
-      setTimeout(() =>
-        document.getElementById("bestDisplay").classList.remove("flash"), 300);
+      setTimeout(() => document.getElementById("bestDisplay").classList.remove("flash"), 300);
     }
 
     food = spawnFood();
@@ -233,28 +225,11 @@ function gameOver() {
   alive = false;
   clearInterval(loop);
 
-  if (!scores[username] || score > scores[username]) {
-    scores[username] = score;
-    localStorage.setItem(SCORE_KEY, JSON.stringify(scores));
-  }
+  if (score > bestLocal) bestLocal = score;
+  saveScore(username, score); // save online
+  fetchTopScores(); // refresh leaderboard
 
   document.getElementById("deathText").classList.remove("hidden");
-  updateLeaderboard();
-}
-
-/* ---------- LEADERBOARD ---------- */
-function updateLeaderboard() {
-  const board = document.getElementById("leaderboard");
-  board.innerHTML = "";
-
-  Object.entries(scores)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .forEach(([name, sc]) => {
-      const li = document.createElement("li");
-      li.textContent = `${name}: ${sc}`;
-      board.appendChild(li);
-    });
 }
 
 /* ---------- AUTO START ---------- */
@@ -263,3 +238,4 @@ if (username) startGame();
 
 </body>
 </html>
+
