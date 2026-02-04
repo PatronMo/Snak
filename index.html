@@ -6,8 +6,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body { margin:0; background:#0f0f0f; color:white; font-family:Arial,sans-serif; text-align:center; }
-canvas { background:#000; border:3px solid #00ff66; margin-top:5px; display:block; margin-left:auto; margin-right:auto; }
+body {
+  margin:0;
+  background:#0f0f0f;
+  color:white;
+  font-family:Arial,sans-serif;
+  text-align:center;
+  overflow-y:auto;
+}
+canvas {
+  background:#000;
+  border:3px solid #00ff66;
+  display:block;
+  margin:10px auto;
+}
 .hidden { display:none; }
 .score { font-size:18px; margin:4px 0; }
 .best { color:gold; transition:transform 0.2s; }
@@ -16,13 +28,63 @@ canvas { background:#000; border:3px solid #00ff66; margin-top:5px; display:bloc
 .score-pop { position:absolute; color:#00ff66; font-weight:bold; pointer-events:none; animation:pop 0.6s ease-out forwards; }
 @keyframes pop { 0% {opacity:1; transform:translateY(0) scale(1);} 100% {opacity:0; transform:translateY(-25px) scale(1.4);} }
 
-#chatBox { max-height:200px; overflow-y:auto; background:#111; border:2px solid #00ff66; padding:5px; margin:10px auto; width:90%; max-width:400px; text-align:left; }
+#chatBox {
+  max-height:250px;
+  overflow-y:auto;
+  background:#111;
+  border:2px solid #00ff66;
+  padding:5px;
+  margin:10px auto;
+  width:90%;
+  max-width:400px;
+  text-align:left;
+}
+
 #chatInput { width:65%; padding:5px; }
 button { padding:5px 10px; cursor:pointer; }
 
-#ownerPanel { margin:10px; border:2px solid red; padding:10px; text-align:left; }
-#madeBy { position:absolute; top:5px; left:5px; color:#00ff66; font-weight:bold; }
-#announcementPopup { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#ff0; color:#000; padding:10px 20px; font-weight:bold; border-radius:5px; display:none; z-index:1000; }
+#ownerPanel {
+  display:none;
+  margin:10px auto;
+  border:2px solid red;
+  padding:10px;
+  width:90%;
+  max-width:400px;
+  text-align:left;
+  background:#222;
+}
+#madeBy {
+  position:absolute;
+  top:5px;
+  left:5px;
+  color:#00ff66;
+  font-weight:bold;
+}
+#announcementPopup {
+  position:fixed;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#ff0;
+  color:#000;
+  padding:10px 20px;
+  font-weight:bold;
+  border-radius:5px;
+  display:none;
+  z-index:1000;
+}
+#ownerToggleBtn {
+  position:fixed;
+  bottom:10px;
+  right:10px;
+  background:red;
+  color:white;
+  font-weight:bold;
+  border:none;
+  border-radius:5px;
+  padding:10px;
+  cursor:pointer;
+}
 </style>
 </head>
 <body>
@@ -55,7 +117,7 @@ button { padding:5px 10px; cursor:pointer; }
   <input id="chatInput" placeholder="Type a message...">
   <button id="chatSendBtn">Send</button>
 
-  <div id="ownerPanel" class="hidden">
+  <div id="ownerPanel">
     <h3>🛠 Owner Panel</h3>
     <div>
       <h4>💯 Adjust Scores</h4>
@@ -73,11 +135,13 @@ button { padding:5px 10px; cursor:pointer; }
   </div>
 </div>
 
+<button id="ownerToggleBtn">×</button>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, getDoc, addDoc, query, orderBy, limit, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-// --- Firebase setup ---
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyB4VdMiIZIjQahzDEMRa_obzQf1bAm-6TI",
   authDomain: "snake-global-leaderboard.firebaseapp.com",
@@ -90,7 +154,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- DOM ---
+// DOM elements
 const usernameScreen = document.getElementById("usernameScreen");
 const gameScreen = document.getElementById("gameScreen");
 const usernameInput = document.getElementById("usernameInput");
@@ -104,6 +168,7 @@ const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const chatSendBtn = document.getElementById("chatSendBtn");
 const ownerPanel = document.getElementById("ownerPanel");
+const ownerToggleBtn = document.getElementById("ownerToggleBtn");
 const ownerPlayerInput = document.getElementById("ownerPlayerInput");
 const ownerScoreInput = document.getElementById("ownerScoreInput");
 const setScoreBtn = document.getElementById("setScoreBtn");
@@ -113,7 +178,7 @@ const announcementInput = document.getElementById("announcementInput");
 const sendAnnouncementBtn = document.getElementById("sendAnnouncementBtn");
 const announcementPopup = document.getElementById("announcementPopup");
 
-// --- Game variables ---
+// Game variables
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const box = 20;
@@ -125,15 +190,15 @@ let nextDirection = "RIGHT";
 let loop = null;
 let alive = true;
 
-// --- Owner ---
+// Owner username
 const OWNER_USERNAME = "PatronMo";
 
-// --- Functions ---
+// Functions
 function spawnFood() { return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
 function scorePop(x,y){ const pop=document.createElement("div"); pop.className="score-pop"; pop.textContent="+1"; pop.style.left=canvas.offsetLeft+x+"px"; pop.style.top=canvas.offsetTop+y+"px"; document.body.appendChild(pop); setTimeout(()=>pop.remove(),600); }
 function showAnnouncement(msg){ announcementPopup.textContent=msg; announcementPopup.style.display="block"; setTimeout(()=>announcementPopup.style.display="none",3000); }
 
-// --- Username ---
+// Username
 async function saveUsername() {
   const input=usernameInput.value.trim(); if(!input) return alert("Enter a username");
   username=input; localStorage.setItem("snake_username",username);
@@ -144,10 +209,13 @@ async function saveUsername() {
   startGame();
 }
 
-// --- Owner panel ---
-function checkOwner(){ if(username===OWNER_USERNAME) ownerPanel.classList.remove("hidden"); }
+// Owner panel toggle
+ownerToggleBtn.addEventListener("click",()=>{
+  if(ownerPanel.style.display==="block"){ ownerPanel.style.display="none"; }
+  else{ if(username===OWNER_USERNAME) ownerPanel.style.display="block"; else alert("Only PatronMo can open owner panel"); }
+});
 
-// --- Chat ---
+// Chat
 async function sendMessage(){
   const text=chatInput.value.trim(); if(!text) return;
   await addDoc(collection(db,"chatMessages"),{username,message:text,timestamp:Date.now()});
@@ -171,7 +239,7 @@ onSnapshot(chatQuery,snapshot=>{
   chatBox.scrollTop=chatBox.scrollHeight;
 });
 
-// --- Leaderboard ---
+// Leaderboard
 async function fetchTopScores(){
   leaderboard.innerHTML="";
   const q=query(collection(db,"scores"),orderBy("score","desc"),limit(10));
@@ -179,7 +247,7 @@ async function fetchTopScores(){
   querySnapshot.forEach(doc=>{const data=doc.data(); const li=document.createElement("li"); li.textContent=`${data.username}: ${data.score}`; leaderboard.appendChild(li);});
 }
 
-// --- Snake game ---
+// Snake game
 function resetGame(){
   snake=[{x:10*box,y:10*box},{x:9*box,y:10*box},{x:8*box,y:10*box}];
   direction="RIGHT"; nextDirection="RIGHT"; score=0; alive=true;
@@ -188,14 +256,12 @@ function resetGame(){
   deathText.classList.add("hidden");
   clearInterval(loop); loop=setInterval(draw,70);
 }
-
 function startGame(){
   usernameScreen.classList.add("hidden"); gameScreen.classList.remove("hidden");
   playerNameEl.textContent=username;
   bestDisplay.textContent=bestLocal;
   resetGame();
   fetchTopScores();
-  checkOwner();
 }
 
 document.addEventListener("keydown",e=>{
@@ -206,28 +272,22 @@ document.addEventListener("keydown",e=>{
   if(e.key==="ArrowUp" && direction!=="DOWN") nextDirection="UP";
   if(e.key==="ArrowDown" && direction!=="UP") nextDirection="DOWN";
 });
-
 function draw(){
   direction=nextDirection;
   ctx.fillStyle="black"; ctx.fillRect(0,0,canvas.width,canvas.height);
   snake.forEach((s,i)=>{ ctx.fillStyle=i===0?"#00ff66":"#00cc55"; ctx.fillRect(s.x,s.y,box,box); });
   ctx.fillStyle="red"; ctx.fillRect(food.x,food.y,box,box);
-
   let head={...snake[0]};
   if(direction==="LEFT") head.x-=box;
   if(direction==="RIGHT") head.x+=box;
   if(direction==="UP") head.y-=box;
   if(direction==="DOWN") head.y+=box;
-
   if(head.x<0||head.y<0||head.x>=canvas.width||head.y>=canvas.height||snake.some(s=>s.x===head.x&&s.y===head.y)) return gameOver();
-
-  if(head.x===food.x && head.y===food.y){
-    score++; scoreDisplay.textContent=score; scorePop(head.x,head.y); food=spawnFood();
+  if(head.x===food.x && head.y===food.y){ score++; scoreDisplay.textContent=score; scorePop(head.x,head.y); food=spawnFood();
     if(score>bestLocal){ bestLocal=score; bestDisplay.textContent=bestLocal; bestDisplay.classList.add("flash"); setTimeout(()=>bestDisplay.classList.remove("flash"),300); localStorage.setItem("snake_best",bestLocal);}
   }else snake.pop();
   snake.unshift(head);
 }
-
 async function gameOver(){
   alive=false; clearInterval(loop);
   const userDocRef=doc(db,"scores",username);
@@ -237,7 +297,7 @@ async function gameOver(){
   deathText.classList.remove("hidden");
 }
 
-// --- Owner actions ---
+// Owner actions
 setScoreBtn.addEventListener("click",async()=>{
   const u=ownerPlayerInput.value.trim(); const s=parseInt(ownerScoreInput.value);
   if(!u||isNaN(s)) return alert("Enter username and valid score");
@@ -262,7 +322,7 @@ sendAnnouncementBtn.addEventListener("click",async()=>{
   showAnnouncement(msg);
 });
 
-// --- Start ---
+// Start
 if(username) startGame();
 startBtn.addEventListener("click",saveUsername);
 
