@@ -141,7 +141,6 @@ button { padding:5px 10px; cursor:pointer; }
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, getDoc, addDoc, query, orderBy, limit, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-// Your new Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCYOMwhe0SpsEucCwB-cLyiPu6d6GPKWJo",
   authDomain: "snake-game-5205d.firebaseapp.com",
@@ -155,7 +154,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// DOM elements
 const usernameScreen = document.getElementById("usernameScreen");
 const gameScreen = document.getElementById("gameScreen");
 const usernameInput = document.getElementById("usernameInput");
@@ -179,10 +177,10 @@ const announcementInput = document.getElementById("announcementInput");
 const sendAnnouncementBtn = document.getElementById("sendAnnouncementBtn");
 const announcementPopup = document.getElementById("announcementPopup");
 
-// Game variables
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const box = 20;
+
 let username = localStorage.getItem("snake_username") || "";
 let bestLocal = parseInt(localStorage.getItem("snake_best")) || 0;
 let snake, food, score;
@@ -191,21 +189,21 @@ let nextDirection = "RIGHT";
 let loop = null;
 let alive = true;
 
-// Owner username
 const OWNER_USERNAME = "PatronMo";
 
 // Functions
-function spawnFood() { return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
+function spawnFood(){ return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
 function scorePop(x,y){ const pop=document.createElement("div"); pop.className="score-pop"; pop.textContent="+1"; pop.style.left=canvas.offsetLeft+x+"px"; pop.style.top=canvas.offsetTop+y+"px"; document.body.appendChild(pop); setTimeout(()=>pop.remove(),600); }
 function showAnnouncement(msg){ announcementPopup.textContent=msg; announcementPopup.style.display="block"; setTimeout(()=>announcementPopup.style.display="none",3000); }
 
 // Username
-async function saveUsername() {
-  const input=usernameInput.value.trim(); if(!input) return alert("Enter a username");
+async function saveUsername(){
+  const input=usernameInput.value.trim();
+  if(!input) return alert("Enter a username");
   username=input; localStorage.setItem("snake_username",username);
   const userDocRef = doc(db,"scores",username);
   const userDoc = await getDoc(userDocRef);
-  if(userDoc.exists()) bestLocal=userDoc.data().score||0; else bestLocal=0;
+  bestLocal=userDoc.exists()?userDoc.data().score||0:0;
   localStorage.setItem("snake_best",bestLocal);
   startGame();
 }
@@ -240,12 +238,21 @@ onSnapshot(chatQuery,snapshot=>{
   chatBox.scrollTop=chatBox.scrollHeight;
 });
 
-// Leaderboard
+// Leaderboard fix
 async function fetchTopScores(){
   leaderboard.innerHTML="";
-  const q=query(collection(db,"scores"),orderBy("score","desc"),limit(10));
-  const querySnapshot = await getDocs(q);
-  querySnapshot.forEach(doc=>{const data=doc.data(); const li=document.createElement("li"); li.textContent=`${data.username}: ${data.score}`; leaderboard.appendChild(li);});
+  const scoresSnapshot = await getDocs(collection(db,"scores"));
+  const scoresArray = [];
+  scoresSnapshot.forEach(docSnap=>{
+    const data=docSnap.data();
+    if(data.username && typeof data.score==="number") scoresArray.push({username:data.username,score:data.score});
+  });
+  scoresArray.sort((a,b)=>b.score - a.score);
+  scoresArray.slice(0,10).forEach(s=>{
+    const li=document.createElement("li");
+    li.textContent=`${s.username}: ${s.score}`;
+    leaderboard.appendChild(li);
+  });
 }
 
 // Snake game
@@ -290,10 +297,13 @@ function draw(){
   snake.unshift(head);
 }
 async function gameOver(){
-  alive=false; clearInterval(loop);
+  alive=false; 
+  clearInterval(loop);
   const userDocRef=doc(db,"scores",username);
   const userDoc=await getDoc(userDocRef);
-  if(!userDoc.exists()||score>userDoc.data().score) await setDoc(userDocRef,{username,score,timestamp:Date.now()});
+  if(!userDoc.exists() || score>userDoc.data().score){
+    await setDoc(userDocRef,{username,score,timestamp:Date.now()});
+  }
   fetchTopScores();
   deathText.classList.remove("hidden");
 }
@@ -330,4 +340,3 @@ startBtn.addEventListener("click",saveUsername);
 </script>
 </body>
 </html>
-
