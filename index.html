@@ -14,10 +14,6 @@
     text-align: center;
   }
 
-  h1 {
-    margin-top: 10px;
-  }
-
   canvas {
     background: #000;
     border: 3px solid #00ff66;
@@ -30,18 +26,7 @@
     margin-top: 5px;
   }
 
-  button {
-    cursor: pointer;
-  }
-
-  .hidden {
-    display: none;
-  }
-
-  ol {
-    padding-left: 0;
-    list-style-position: inside;
-  }
+  .hidden { display: none; }
 </style>
 </head>
 
@@ -53,40 +38,41 @@
   <p>Choose a username (cannot be changed)</p>
   <input id="usernameInput" maxlength="12" placeholder="Username">
   <br>
-  <button onclick="saveUsername()">Start Game</button>
+  <button onclick="saveUsername()">Start</button>
 </div>
 
 <div id="gameScreen" class="hidden">
   <p>Player: <strong id="playerName"></strong></p>
   <canvas id="game" width="400" height="400"></canvas>
+  <p id="deathText" class="hidden">💀 You died — press <b>SPACE</b> to respawn</p>
 
   <h3>🏆 Leaderboard</h3>
   <ol id="leaderboard"></ol>
 </div>
 
 <script>
-/* -------------------- STORAGE -------------------- */
+/* ---------------- STORAGE ---------------- */
 const USER_KEY = "snake_username";
 const SCORE_KEY = "snake_scores";
 
 let username = localStorage.getItem(USER_KEY);
 let scores = JSON.parse(localStorage.getItem(SCORE_KEY)) || {};
 
-/* -------------------- GAME VARS -------------------- */
+/* ---------------- CANVAS ---------------- */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
 const box = 20;
-let snake = [];
-let direction = "RIGHT";
-let food = {};
-let score = 0;
-let loop;
 
-/* -------------------- USERNAME -------------------- */
+/* ---------------- GAME STATE ---------------- */
+let snake, food, score;
+let direction = "RIGHT";
+let nextDirection = "RIGHT";
+let loop = null;
+let alive = true;
+
+/* ---------------- USERNAME ---------------- */
 function saveUsername() {
   const input = document.getElementById("usernameInput").value.trim();
-
   if (!input) return alert("Enter a username");
   if (scores[input]) return alert("Username already exists");
 
@@ -95,23 +81,36 @@ function saveUsername() {
   startGame();
 }
 
-/* -------------------- START -------------------- */
+/* ---------------- START GAME ---------------- */
 function startGame() {
   document.getElementById("usernameScreen").classList.add("hidden");
   document.getElementById("gameScreen").classList.remove("hidden");
   document.getElementById("playerName").textContent = username;
+  resetGame();
+}
 
-  snake = [{ x: 9 * box, y: 10 * box }];
+/* ---------------- RESET / RESPAWN ---------------- */
+function resetGame() {
+  snake = [
+    { x: 10 * box, y: 10 * box },
+    { x: 9 * box,  y: 10 * box },
+    { x: 8 * box,  y: 10 * box }
+  ];
+
   direction = "RIGHT";
+  nextDirection = "RIGHT";
   score = 0;
+  alive = true;
   food = spawnFood();
 
+  document.getElementById("deathText").classList.add("hidden");
+
   clearInterval(loop);
-  loop = setInterval(draw, 100);
+  loop = setInterval(draw, 70); // smoother movement
   updateLeaderboard();
 }
 
-/* -------------------- FOOD -------------------- */
+/* ---------------- FOOD ---------------- */
 function spawnFood() {
   return {
     x: Math.floor(Math.random() * 20) * box,
@@ -119,22 +118,26 @@ function spawnFood() {
   };
 }
 
-/* -------------------- CONTROLS -------------------- */
+/* ---------------- INPUT ---------------- */
 document.addEventListener("keydown", e => {
-  if (e.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
-  if (e.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
-  if (e.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
-  if (e.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+  if (!alive && e.code === "Space") resetGame();
+
+  if (e.key === "ArrowLeft"  && direction !== "RIGHT") nextDirection = "LEFT";
+  if (e.key === "ArrowUp"    && direction !== "DOWN")  nextDirection = "UP";
+  if (e.key === "ArrowRight" && direction !== "LEFT")  nextDirection = "RIGHT";
+  if (e.key === "ArrowDown"  && direction !== "UP")    nextDirection = "DOWN";
 });
 
-/* -------------------- DRAW -------------------- */
+/* ---------------- DRAW LOOP ---------------- */
 function draw() {
+  direction = nextDirection;
+
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  snake.forEach((part, i) => {
+  snake.forEach((s, i) => {
     ctx.fillStyle = i === 0 ? "#00ff66" : "#00cc55";
-    ctx.fillRect(part.x, part.y, box, box);
+    ctx.fillRect(s.x, s.y, box, box);
   });
 
   ctx.fillStyle = "red";
@@ -150,7 +153,7 @@ function draw() {
   if (
     head.x < 0 || head.y < 0 ||
     head.x >= canvas.width || head.y >= canvas.height ||
-    snake.some(p => p.x === head.x && p.y === head.y)
+    snake.some(s => s.x === head.x && s.y === head.y)
   ) {
     return gameOver();
   }
@@ -165,21 +168,21 @@ function draw() {
   snake.unshift(head);
 }
 
-/* -------------------- GAME OVER -------------------- */
+/* ---------------- GAME OVER ---------------- */
 function gameOver() {
+  alive = false;
   clearInterval(loop);
 
-  // 🔑 THIS PREVENTS DUPLICATES
   if (!scores[username] || score > scores[username]) {
     scores[username] = score;
     localStorage.setItem(SCORE_KEY, JSON.stringify(scores));
   }
 
-  alert("Game Over! Score: " + score);
+  document.getElementById("deathText").classList.remove("hidden");
   updateLeaderboard();
 }
 
-/* -------------------- LEADERBOARD -------------------- */
+/* ---------------- LEADERBOARD ---------------- */
 function updateLeaderboard() {
   const board = document.getElementById("leaderboard");
   board.innerHTML = "";
@@ -194,11 +197,13 @@ function updateLeaderboard() {
     });
 }
 
-/* -------------------- AUTO START -------------------- */
-if (username) {
-  startGame();
-}
+/* ---------------- AUTO START ---------------- */
+if (username) startGame();
 </script>
+
+</body>
+</html>
+
 
 </body>
 </html>
