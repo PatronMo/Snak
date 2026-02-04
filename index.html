@@ -141,16 +141,17 @@ button { padding:5px 10px; cursor:pointer; }
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, getDoc, addDoc, query, orderBy, limit, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-// Firebase config
+// Your new Firebase config
 const firebaseConfig = {
-  apiKey: "AIzaSyB4VdMiIZIjQahzDEMRa_obzQf1bAm-6TI",
-  authDomain: "snake-global-leaderboard.firebaseapp.com",
-  projectId: "snake-global-leaderboard",
-  storageBucket: "snake-global-leaderboard.firebasestorage.app",
-  messagingSenderId: "931881309923",
-  appId: "1:931881309923:web:43de09e6cd566b3e2a97d6",
-  measurementId: "G-883P0X3S65"
+  apiKey: "AIzaSyCYOMwhe0SpsEucCwB-cLyiPu6d6GPKWJo",
+  authDomain: "snake-game-5205d.firebaseapp.com",
+  projectId: "snake-game-5205d",
+  storageBucket: "snake-game-5205d.firebasestorage.app",
+  messagingSenderId: "669471957796",
+  appId: "1:669471957796:web:5d69121f9a74e696fb49b1",
+  measurementId: "G-75TJWFLDSK"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
