@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body { margin:0; background:#0f0f0f; color:white; font-family:Arial,sans-serif; text-align:center; overflow:hidden; }
+body { margin:0; background:#0f0f0f; color:white; font-family:Arial,sans-serif; text-align:center; }
 canvas { background:#000; border:3px solid #00ff66; margin-top:5px; display:block; margin-left:auto; margin-right:auto; }
 .hidden { display:none; }
 .score { font-size:18px; margin:4px 0; }
@@ -16,17 +16,19 @@ canvas { background:#000; border:3px solid #00ff66; margin-top:5px; display:bloc
 .score-pop { position:absolute; color:#00ff66; font-weight:bold; pointer-events:none; animation:pop 0.6s ease-out forwards; }
 @keyframes pop { 0% {opacity:1; transform:translateY(0) scale(1);} 100% {opacity:0; transform:translateY(-25px) scale(1.4);} }
 
-#chatBox { height:200px; overflow-y:auto; background:#111; border:2px solid #00ff66; padding:5px; margin:10px auto; width:90%; max-width:400px; text-align:left; }
+#chatBox { max-height:200px; overflow-y:auto; background:#111; border:2px solid #00ff66; padding:5px; margin:10px auto; width:90%; max-width:400px; text-align:left; }
 #chatInput { width:65%; padding:5px; }
 button { padding:5px 10px; cursor:pointer; }
 
 #ownerPanel { margin:10px; border:2px solid red; padding:10px; text-align:left; }
 #madeBy { position:absolute; top:5px; left:5px; color:#00ff66; font-weight:bold; }
+#announcementPopup { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#ff0; color:#000; padding:10px 20px; font-weight:bold; border-radius:5px; display:none; z-index:1000; }
 </style>
 </head>
 <body>
 
 <div id="madeBy">Made by PatronMo</div>
+<div id="announcementPopup"></div>
 
 <h1>🐍 Snake</h1>
 
@@ -75,7 +77,7 @@ button { padding:5px 10px; cursor:pointer; }
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, getDoc, addDoc, query, orderBy, limit, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-// --- Firebase config ---
+// --- Firebase setup ---
 const firebaseConfig = {
   apiKey: "AIzaSyB4VdMiIZIjQahzDEMRa_obzQf1bAm-6TI",
   authDomain: "snake-global-leaderboard.firebaseapp.com",
@@ -109,6 +111,7 @@ const deletePlayerBtn = document.getElementById("deletePlayerBtn");
 const clearChatBtn = document.getElementById("clearChatBtn");
 const announcementInput = document.getElementById("announcementInput");
 const sendAnnouncementBtn = document.getElementById("sendAnnouncementBtn");
+const announcementPopup = document.getElementById("announcementPopup");
 
 // --- Game variables ---
 const canvas = document.getElementById("game");
@@ -128,11 +131,12 @@ const OWNER_USERNAME = "PatronMo";
 // --- Functions ---
 function spawnFood() { return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
 function scorePop(x,y){ const pop=document.createElement("div"); pop.className="score-pop"; pop.textContent="+1"; pop.style.left=canvas.offsetLeft+x+"px"; pop.style.top=canvas.offsetTop+y+"px"; document.body.appendChild(pop); setTimeout(()=>pop.remove(),600); }
+function showAnnouncement(msg){ announcementPopup.textContent=msg; announcementPopup.style.display="block"; setTimeout(()=>announcementPopup.style.display="none",3000); }
 
+// --- Username ---
 async function saveUsername() {
   const input=usernameInput.value.trim(); if(!input) return alert("Enter a username");
   username=input; localStorage.setItem("snake_username",username);
-
   const userDocRef = doc(db,"scores",username);
   const userDoc = await getDoc(userDocRef);
   if(userDoc.exists()) bestLocal=userDoc.data().score||0; else bestLocal=0;
@@ -158,7 +162,12 @@ onSnapshot(chatQuery,snapshot=>{
   snapshot.forEach(doc=>messages.push(doc.data()));
   messages.reverse();
   chatBox.innerHTML="";
-  messages.forEach(m=>{ const div=document.createElement("div"); div.textContent=`${m.username}: ${m.message}`; chatBox.appendChild(div);});
+  messages.forEach(m=>{
+    const div=document.createElement("div");
+    div.textContent=`${m.username}: ${m.message}`;
+    chatBox.appendChild(div);
+    if(m.username==="🌟 Announcement") showAnnouncement(m.message);
+  });
   chatBox.scrollTop=chatBox.scrollHeight;
 });
 
@@ -250,11 +259,14 @@ sendAnnouncementBtn.addEventListener("click",async()=>{
   const msg=announcementInput.value.trim(); if(!msg) return;
   await addDoc(collection(db,"chatMessages"),{username:"🌟 Announcement",message:msg,timestamp:Date.now()});
   announcementInput.value="";
+  showAnnouncement(msg);
 });
 
-// --- Start if username exists ---
+// --- Start ---
 if(username) startGame();
 startBtn.addEventListener("click",saveUsername);
+
 </script>
 </body>
 </html>
+
