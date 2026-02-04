@@ -19,9 +19,14 @@ canvas { background:#000; border:3px solid #00ff66; margin-top:5px; }
 #chatBox { height:200px; overflow-y:auto; background:#111; border:2px solid #00ff66; padding:5px; margin:10px auto; width:90%; max-width:400px; text-align:left; }
 #chatInput { width:65%; padding:5px; }
 button { padding:5px 10px; cursor:pointer; }
+
+#ownerPanel { margin:10px; border:2px solid red; padding:10px; text-align:left; }
+#madeBy { position:absolute; top:5px; left:5px; color:#00ff66; font-weight:bold; }
 </style>
 </head>
 <body>
+
+<div id="madeBy">Made by Patron Mo</div>
 
 <h1>🐍 Snake</h1>
 
@@ -49,6 +54,26 @@ button { padding:5px 10px; cursor:pointer; }
   <div id="chatBox"></div>
   <input id="chatInput" placeholder="Type a message...">
   <button id="chatSendBtn">Send</button>
+
+  <div id="ownerPanel" class="hidden">
+    <h3>🛠 Owner Panel</h3>
+
+    <div>
+      <h4>💯 Adjust Scores</h4>
+      <input id="ownerPlayerInput" placeholder="Username">
+      <input id="ownerScoreInput" type="number" placeholder="Score">
+      <button id="setScoreBtn">Set Score</button>
+      <button id="deletePlayerBtn">Delete Player</button>
+    </div>
+
+    <div>
+      <h4>💬 Chat & Announcement</h4>
+      <button id="clearChatBtn">Clear Chat</button>
+      <input id="announcementInput" placeholder="Announcement">
+      <button id="sendAnnouncementBtn">Send Announcement</button>
+    </div>
+  </div>
+
 </div>
 
 <script type="module">
@@ -81,8 +106,15 @@ const leaderboard = document.getElementById("leaderboard");
 const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const chatSendBtn = document.getElementById("chatSendBtn");
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+
+const ownerPanel = document.getElementById("ownerPanel");
+const ownerPlayerInput = document.getElementById("ownerPlayerInput");
+const ownerScoreInput = document.getElementById("ownerScoreInput");
+const setScoreBtn = document.getElementById("setScoreBtn");
+const deletePlayerBtn = document.getElementById("deletePlayerBtn");
+const clearChatBtn = document.getElementById("clearChatBtn");
+const announcementInput = document.getElementById("announcementInput");
+const sendAnnouncementBtn = document.getElementById("sendAnnouncementBtn");
 
 // --- Game variables ---
 const box = 20;
@@ -94,9 +126,11 @@ let nextDirection = "RIGHT";
 let loop = null;
 let alive = true;
 
+// --- Owner config ---
+const OWNER_USERNAME = "Patron Mo"; // jouw username
+
 // --- Helper functions ---
 function spawnFood() { return { x: Math.floor(Math.random()*20)*box, y: Math.floor(Math.random()*20)*box }; }
-
 function scorePop(x,y){
   const pop=document.createElement("div");
   pop.className="score-pop";
@@ -111,15 +145,12 @@ function scorePop(x,y){
 async function saveUsername() {
   const input = usernameInput.value.trim();
   if(!input) return alert("Enter a username");
-  
+
   const userDocRef = doc(db,"scores",input);
   const userDoc = await getDoc(userDocRef);
-  
   if(userDoc.exists()){
-    // Username exists: load their best score
     bestLocal = userDoc.data().score || 0;
   } else {
-    // New user
     bestLocal = 0;
     await setDoc(userDocRef,{username:input,score:0,timestamp:Date.now()});
   }
@@ -129,8 +160,14 @@ async function saveUsername() {
   localStorage.setItem("snake_best", bestLocal);
   startGame();
 }
-
 startBtn.addEventListener("click", saveUsername);
+
+// --- Owner panel visibility ---
+function checkOwner() {
+  if(username === OWNER_USERNAME){
+    ownerPanel.classList.remove("hidden");
+  }
+}
 
 // --- Chat ---
 function sendMessage() {
@@ -142,16 +179,15 @@ function sendMessage() {
     timestamp:Date.now()
   }).then(()=>{chatInput.value=""; chatInput.focus();});
 }
-
 chatSendBtn.addEventListener("click",sendMessage);
-chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault(); sendMessage();}});
+chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendMessage();}});
 
 // Realtime chat (last 50 messages)
 const chatQuery = query(collection(db,"chatMessages"),orderBy("timestamp","desc"),limit(50));
 onSnapshot(chatQuery,snapshot=>{
   const messages = [];
   snapshot.forEach(doc=>messages.push(doc.data()));
-  messages.reverse(); // oldest first
+  messages.reverse();
   chatBox.innerHTML="";
   messages.forEach(m=>{
     const div=document.createElement("div");
@@ -193,10 +229,15 @@ function startGame(){
   bestDisplay.textContent=bestLocal;
   resetGame();
   fetchTopScores();
+  checkOwner();
 }
 
-document.addEventListener("keydown",e=>{
+// --- Prevent browser scroll for arrows and space ---
+document.addEventListener("keydown", e => {
+  if(["ArrowLeft","ArrowUp","ArrowRight","ArrowDown"," "].includes(e.key)) e.preventDefault();
+
   if(!alive && e.code==="Space") resetGame();
+
   if(e.key==="ArrowLeft" && direction!=="RIGHT") nextDirection="LEFT";
   if(e.key==="ArrowRight" && direction!=="LEFT") nextDirection="RIGHT";
   if(e.key==="ArrowUp" && direction!=="DOWN") nextDirection="UP";
@@ -236,7 +277,6 @@ function draw(){
 async function gameOver(){
   alive=false;
   clearInterval(loop);
-  // Save highest score
   const userDocRef=doc(db,"scores",username);
   const userDoc=await getDoc(userDocRef);
   if(!userDoc.exists()||score>userDoc.data().score){
@@ -246,9 +286,45 @@ async function gameOver(){
   deathText.classList.remove("hidden");
 }
 
+// --- Owner actions ---
+setScoreBtn.addEventListener("click",async()=>{
+  const u=ownerPlayerInput.value.trim();
+  const s=parseInt(ownerScoreInput.value);
+  if(!u||isNaN(s)) return alert("Enter username and valid score");
+  const userRef=doc(db,"scores",u);
+  await setDoc(userRef,{username:u,score:s,timestamp:Date.now()});
+  fetchTopScores();
+});
+
+deletePlayerBtn.addEventListener("click",async()=>{
+  const u=ownerPlayerInput.value.trim();
+  if(!u) return alert("Enter username");
+  const userRef=doc(db,"scores",u);
+  await deleteDoc(userRef);
+  fetchTopScores();
+});
+
+clearChatBtn.addEventListener("click",async()=>{
+  const q = query(collection(db,"chatMessages"));
+  const snapshot = await getDocs(q);
+  snapshot.forEach(async docSnap => await deleteDoc(doc(db,"chatMessages",docSnap.id)));
+});
+
+sendAnnouncementBtn.addEventListener("click",async()=>{
+  const msg=announcementInput.value.trim();
+  if(!msg) return;
+  await addDoc(collection(db,"chatMessages"),{
+    username:"🌟 Announcement",
+    message:msg,
+    timestamp:Date.now()
+  });
+  announcementInput.value="";
+});
+
 // Auto start if username exists
 if(username) startGame();
 
 </script>
 </body>
 </html>
+
