@@ -6,8 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body { margin:0; background:#0f0f0f; color:white; font-family:Arial,sans-serif; text-align:center; }
-canvas { background:#000; border:3px solid #00ff66; margin-top:5px; }
+body { margin:0; background:#0f0f0f; color:white; font-family:Arial,sans-serif; text-align:center; overflow:hidden; }
+canvas { background:#000; border:3px solid #00ff66; margin-top:5px; display:block; margin-left:auto; margin-right:auto; }
 .hidden { display:none; }
 .score { font-size:18px; margin:4px 0; }
 .best { color:gold; transition:transform 0.2s; }
@@ -41,9 +41,7 @@ button { padding:5px 10px; cursor:pointer; }
   <p>Player: <strong id="playerName"></strong></p>
   <p class="score">Score: <strong id="scoreDisplay">0</strong> | Best: <strong id="bestDisplay" class="best">0</strong></p>
 
-  <div style="position:relative; display:inline-block;">
-    <canvas id="game" width="400" height="400"></canvas>
-  </div>
+  <canvas id="game" width="400" height="400"></canvas>
 
   <p id="deathText" class="hidden">💀 You died — press <b>SPACE</b> to respawn</p>
 
@@ -57,7 +55,6 @@ button { padding:5px 10px; cursor:pointer; }
 
   <div id="ownerPanel" class="hidden">
     <h3>🛠 Owner Panel</h3>
-
     <div>
       <h4>💯 Adjust Scores</h4>
       <input id="ownerPlayerInput" placeholder="Username">
@@ -65,22 +62,20 @@ button { padding:5px 10px; cursor:pointer; }
       <button id="setScoreBtn">Set Score</button>
       <button id="deletePlayerBtn">Delete Player</button>
     </div>
-
     <div>
-      <h4>💬 Chat & Announcement</h4>
+      <h4>💬 Chat Management</h4>
       <button id="clearChatBtn">Clear Chat</button>
       <input id="announcementInput" placeholder="Announcement">
       <button id="sendAnnouncementBtn">Send Announcement</button>
     </div>
   </div>
-
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, getDoc, addDoc, query, orderBy, limit, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-// --- Firebase setup ---
+// --- Firebase config ---
 const firebaseConfig = {
   apiKey: "AIzaSyB4VdMiIZIjQahzDEMRa_obzQf1bAm-6TI",
   authDomain: "snake-global-leaderboard.firebaseapp.com",
@@ -93,7 +88,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- DOM elements ---
+// --- DOM ---
 const usernameScreen = document.getElementById("usernameScreen");
 const gameScreen = document.getElementById("gameScreen");
 const usernameInput = document.getElementById("usernameInput");
@@ -106,7 +101,6 @@ const leaderboard = document.getElementById("leaderboard");
 const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const chatSendBtn = document.getElementById("chatSendBtn");
-
 const ownerPanel = document.getElementById("ownerPanel");
 const ownerPlayerInput = document.getElementById("ownerPlayerInput");
 const ownerScoreInput = document.getElementById("ownerScoreInput");
@@ -117,6 +111,8 @@ const announcementInput = document.getElementById("announcementInput");
 const sendAnnouncementBtn = document.getElementById("sendAnnouncementBtn");
 
 // --- Game variables ---
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 const box = 20;
 let username = localStorage.getItem("snake_username") || "";
 let bestLocal = parseInt(localStorage.getItem("snake_best")) || 0;
@@ -126,75 +122,44 @@ let nextDirection = "RIGHT";
 let loop = null;
 let alive = true;
 
-// --- Owner config ---
-const OWNER_USERNAME = "PatronMo"; // jouw username
+// --- Owner ---
+const OWNER_USERNAME = "PatronMo";
 
-// --- Helper functions ---
-function spawnFood() { return { x: Math.floor(Math.random()*20)*box, y: Math.floor(Math.random()*20)*box }; }
-function scorePop(x,y){
-  const pop=document.createElement("div");
-  pop.className="score-pop";
-  pop.textContent="+1";
-  pop.style.left=canvas.offsetLeft+x+"px";
-  pop.style.top=canvas.offsetTop+y+"px";
-  document.body.appendChild(pop);
-  setTimeout(()=>pop.remove(),600);
-}
+// --- Functions ---
+function spawnFood() { return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
+function scorePop(x,y){ const pop=document.createElement("div"); pop.className="score-pop"; pop.textContent="+1"; pop.style.left=canvas.offsetLeft+x+"px"; pop.style.top=canvas.offsetTop+y+"px"; document.body.appendChild(pop); setTimeout(()=>pop.remove(),600); }
 
-// --- Username ---
 async function saveUsername() {
-  const input = usernameInput.value.trim();
-  if(!input) return alert("Enter a username");
+  const input=usernameInput.value.trim(); if(!input) return alert("Enter a username");
+  username=input; localStorage.setItem("snake_username",username);
 
-  const userDocRef = doc(db,"scores",input);
+  const userDocRef = doc(db,"scores",username);
   const userDoc = await getDoc(userDocRef);
-  if(userDoc.exists()){
-    bestLocal = userDoc.data().score || 0;
-  } else {
-    bestLocal = 0;
-    await setDoc(userDocRef,{username:input,score:0,timestamp:Date.now()});
-  }
-
-  username = input;
-  localStorage.setItem("snake_username", username);
-  localStorage.setItem("snake_best", bestLocal);
+  if(userDoc.exists()) bestLocal=userDoc.data().score||0; else bestLocal=0;
+  localStorage.setItem("snake_best",bestLocal);
   startGame();
 }
-startBtn.addEventListener("click", saveUsername);
 
-// --- Owner panel visibility ---
-function checkOwner() {
-  if(username === OWNER_USERNAME){
-    ownerPanel.classList.remove("hidden");
-  }
-}
+// --- Owner panel ---
+function checkOwner(){ if(username===OWNER_USERNAME) ownerPanel.classList.remove("hidden"); }
 
 // --- Chat ---
-function sendMessage() {
-  const text = chatInput.value.trim();
-  if(!text||!username) return;
-  addDoc(collection(db,"chatMessages"),{
-    username,
-    message:text,
-    timestamp:Date.now()
-  }).then(()=>{chatInput.value=""; chatInput.focus();});
+async function sendMessage(){
+  const text=chatInput.value.trim(); if(!text) return;
+  await addDoc(collection(db,"chatMessages"),{username,message:text,timestamp:Date.now()});
+  chatInput.value=""; chatInput.focus();
 }
 chatSendBtn.addEventListener("click",sendMessage);
-chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendMessage();}});
+chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"){ e.preventDefault(); sendMessage();}});
 
-// Realtime chat (last 50 messages)
-const chatQuery = query(collection(db,"chatMessages"),orderBy("timestamp","desc"),limit(50));
+const chatQuery=query(collection(db,"chatMessages"),orderBy("timestamp","desc"),limit(50));
 onSnapshot(chatQuery,snapshot=>{
-  const messages = [];
+  const messages=[];
   snapshot.forEach(doc=>messages.push(doc.data()));
   messages.reverse();
   chatBox.innerHTML="";
-  messages.forEach(m=>{
-    const div=document.createElement("div");
-    div.textContent=`${m.username}: ${m.message}`;
-    chatBox.appendChild(div);
-  });
-  chatBox.scrollTop = chatBox.scrollHeight;
+  messages.forEach(m=>{ const div=document.createElement("div"); div.textContent=`${m.username}: ${m.message}`; chatBox.appendChild(div);});
+  chatBox.scrollTop=chatBox.scrollHeight;
 });
 
 // --- Leaderboard ---
@@ -202,29 +167,21 @@ async function fetchTopScores(){
   leaderboard.innerHTML="";
   const q=query(collection(db,"scores"),orderBy("score","desc"),limit(10));
   const querySnapshot = await getDocs(q);
-  querySnapshot.forEach(doc=>{
-    const data=doc.data();
-    const li=document.createElement("li");
-    li.textContent=`${data.username}: ${data.score}`;
-    leaderboard.appendChild(li);
-  });
+  querySnapshot.forEach(doc=>{const data=doc.data(); const li=document.createElement("li"); li.textContent=`${data.username}: ${data.score}`; leaderboard.appendChild(li);});
 }
 
-// --- Game functions ---
+// --- Snake game ---
 function resetGame(){
   snake=[{x:10*box,y:10*box},{x:9*box,y:10*box},{x:8*box,y:10*box}];
-  direction="RIGHT"; nextDirection="RIGHT";
-  score=0; alive=true;
+  direction="RIGHT"; nextDirection="RIGHT"; score=0; alive=true;
   food=spawnFood();
   scoreDisplay.textContent=0;
   deathText.classList.add("hidden");
-  clearInterval(loop);
-  loop=setInterval(draw,70);
+  clearInterval(loop); loop=setInterval(draw,70);
 }
 
 function startGame(){
-  usernameScreen.classList.add("hidden");
-  gameScreen.classList.remove("hidden");
+  usernameScreen.classList.add("hidden"); gameScreen.classList.remove("hidden");
   playerNameEl.textContent=username;
   bestDisplay.textContent=bestLocal;
   resetGame();
@@ -232,12 +189,9 @@ function startGame(){
   checkOwner();
 }
 
-// --- Prevent browser scroll for arrows and space ---
-document.addEventListener("keydown", e => {
+document.addEventListener("keydown",e=>{
   if(["ArrowLeft","ArrowUp","ArrowRight","ArrowDown"," "].includes(e.key)) e.preventDefault();
-
   if(!alive && e.code==="Space") resetGame();
-
   if(e.key==="ArrowLeft" && direction!=="RIGHT") nextDirection="LEFT";
   if(e.key==="ArrowRight" && direction!=="LEFT") nextDirection="RIGHT";
   if(e.key==="ArrowUp" && direction!=="DOWN") nextDirection="UP";
@@ -247,7 +201,7 @@ document.addEventListener("keydown", e => {
 function draw(){
   direction=nextDirection;
   ctx.fillStyle="black"; ctx.fillRect(0,0,canvas.width,canvas.height);
-  snake.forEach((s,i)=>{ctx.fillStyle=i===0?"#00ff66":"#00cc55"; ctx.fillRect(s.x,s.y,box,box);});
+  snake.forEach((s,i)=>{ ctx.fillStyle=i===0?"#00ff66":"#00cc55"; ctx.fillRect(s.x,s.y,box,box); });
   ctx.fillStyle="red"; ctx.fillRect(food.x,food.y,box,box);
 
   let head={...snake[0]};
@@ -256,75 +210,51 @@ function draw(){
   if(direction==="UP") head.y-=box;
   if(direction==="DOWN") head.y+=box;
 
-  if(head.x<0||head.y<0||head.x>=canvas.width||head.y>=canvas.height||
-     snake.some(s=>s.x===head.x&&s.y===head.y)) return gameOver();
+  if(head.x<0||head.y<0||head.x>=canvas.width||head.y>=canvas.height||snake.some(s=>s.x===head.x&&s.y===head.y)) return gameOver();
 
   if(head.x===food.x && head.y===food.y){
-    score++; scoreDisplay.textContent=score;
-    scorePop(head.x,head.y);
-    food=spawnFood();
-    if(score>bestLocal){
-      bestLocal=score;
-      bestDisplay.textContent=bestLocal;
-      bestDisplay.classList.add("flash");
-      setTimeout(()=>bestDisplay.classList.remove("flash"),300);
-      localStorage.setItem("snake_best",bestLocal);
-    }
-  } else snake.pop();
+    score++; scoreDisplay.textContent=score; scorePop(head.x,head.y); food=spawnFood();
+    if(score>bestLocal){ bestLocal=score; bestDisplay.textContent=bestLocal; bestDisplay.classList.add("flash"); setTimeout(()=>bestDisplay.classList.remove("flash"),300); localStorage.setItem("snake_best",bestLocal);}
+  }else snake.pop();
   snake.unshift(head);
 }
 
 async function gameOver(){
-  alive=false;
-  clearInterval(loop);
+  alive=false; clearInterval(loop);
   const userDocRef=doc(db,"scores",username);
   const userDoc=await getDoc(userDocRef);
-  if(!userDoc.exists()||score>userDoc.data().score){
-    await setDoc(userDocRef,{username,score:score,timestamp:Date.now()});
-  }
+  if(!userDoc.exists()||score>userDoc.data().score) await setDoc(userDocRef,{username,score,timestamp:Date.now()});
   fetchTopScores();
   deathText.classList.remove("hidden");
 }
 
 // --- Owner actions ---
 setScoreBtn.addEventListener("click",async()=>{
-  const u=ownerPlayerInput.value.trim();
-  const s=parseInt(ownerScoreInput.value);
+  const u=ownerPlayerInput.value.trim(); const s=parseInt(ownerScoreInput.value);
   if(!u||isNaN(s)) return alert("Enter username and valid score");
-  const userRef=doc(db,"scores",u);
-  await setDoc(userRef,{username:u,score:s,timestamp:Date.now()});
+  await setDoc(doc(db,"scores",u),{username:u,score:s,timestamp:Date.now()});
   fetchTopScores();
 });
-
 deletePlayerBtn.addEventListener("click",async()=>{
-  const u=ownerPlayerInput.value.trim();
-  if(!u) return alert("Enter username");
-  const userRef=doc(db,"scores",u);
-  await deleteDoc(userRef);
+  const u=ownerPlayerInput.value.trim(); if(!u) return alert("Enter username");
+  await deleteDoc(doc(db,"scores",u));
   fetchTopScores();
 });
-
 clearChatBtn.addEventListener("click",async()=>{
-  const q = query(collection(db,"chatMessages"));
-  const snapshot = await getDocs(q);
-  snapshot.forEach(async docSnap => await deleteDoc(doc(db,"chatMessages",docSnap.id)));
+  if(username!==OWNER_USERNAME) return;
+  if(!confirm("Weet je zeker dat je alle chatberichten wilt verwijderen?")) return;
+  const snapshot=await getDocs(collection(db,"chatMessages"));
+  snapshot.forEach(async docSnap=>await deleteDoc(doc(db,"chatMessages",docSnap.id)));
 });
-
 sendAnnouncementBtn.addEventListener("click",async()=>{
-  const msg=announcementInput.value.trim();
-  if(!msg) return;
-  await addDoc(collection(db,"chatMessages"),{
-    username:"🌟 Announcement",
-    message:msg,
-    timestamp:Date.now()
-  });
+  const msg=announcementInput.value.trim(); if(!msg) return;
+  await addDoc(collection(db,"chatMessages"),{username:"🌟 Announcement",message:msg,timestamp:Date.now()});
   announcementInput.value="";
 });
 
-// Auto start if username exists
+// --- Start if username exists ---
 if(username) startGame();
-
+startBtn.addEventListener("click",saveUsername);
 </script>
 </body>
 </html>
-
