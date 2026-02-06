@@ -231,14 +231,7 @@ toggleInvisibleBtn.addEventListener("click", async ()=>{ if(!(await checkOwnerAc
 
 // ---------------- POLL ----------------
 const pollDoc = doc(db,"polls","currentPoll");
-createPollBtn.addEventListener("click", async ()=>{
-  if(!(await checkOwnerAction())) return;
-  const question=pollQuestionInput.value.trim();
-  const options=pollOptionsInput.value.trim().split(",").map(o=>o.trim()).filter(o=>o);
-  if(!question||options.length<2) return alert("Enter question and at least 2 options");
-  await setDoc(pollDoc,{question, options, votes:{}, open:true});
-  pollQuestionInput.value=""; pollOptionsInput.value="";
-});
+createPollBtn.addEventListener("click", async ()=>{ if(!(await checkOwnerAction())) return; const question=pollQuestionInput.value.trim(); const options=pollOptionsInput.value.trim().split(",").map(o=>o.trim()).filter(o=>o); if(!question||options.length<2) return alert("Enter question and at least 2 options"); await setDoc(pollDoc,{question, options, votes:{}, open:true}); pollQuestionInput.value=""; pollOptionsInput.value=""; });
 closePollBtn.addEventListener("click", async()=>{ if(!(await checkOwnerAction())) return; await setDoc(pollDoc,{open:false},{merge:true}); });
 
 onSnapshot(pollDoc,snapshot=>{
@@ -272,8 +265,7 @@ activateAbilityBtn.addEventListener("click", async()=>{
   abilityTimer = setInterval(()=>{
     const remaining = Math.max(0, Math.ceil((abilityEndTime - Date.now())/1000));
     abilityTimerDisplay.textContent = remaining>0?`Active: ${remaining}s remaining`:"Inactive";
-    if(remaining <=0){
-      clearInterval(if(remaining <= 0){
+    if(remaining <= 0){
       clearInterval(abilityTimer);
       abilityTimerDisplay.textContent = "Inactive";
       showAnnouncement(msg);
