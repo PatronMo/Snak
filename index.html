@@ -64,6 +64,7 @@ button {padding:5px 10px; cursor:pointer;}
       <h4>💯 Adjust Scores</h4>
       <input id="ownerScoreInput" type="number" placeholder="Add Score">
       <button id="setScoreBtn">Add Score</button>
+      <button id="deletePlayerBtn">Delete Player</button>
     </div>
     <div>
       <h4>💬 Chat Management</h4>
@@ -79,6 +80,7 @@ button {padding:5px 10px; cursor:pointer;}
     <div>
       <h4>🕶 Invisibility</h4>
       <button id="toggleInvisibleBtn">Toggle Invisibility</button>
+      <input id="customInvisTime" type="number" placeholder="Seconds">
     </div>
     <div>
       <h4>📊 Poll Controls</h4>
@@ -89,6 +91,7 @@ button {padding:5px 10px; cursor:pointer;}
     </div>
     <div>
       <h4>💥 Global Ability</h4>
+      <input id="customAbilityTime" type="number" placeholder="Seconds">
       <button id="activateAbilityBtn">Activate Ability</button>
     </div>
     <div>
@@ -116,7 +119,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ---------------- DOM ----------------
+// DOM Elements
 const usernameScreen = document.getElementById("usernameScreen");
 const gameScreen = document.getElementById("gameScreen");
 const usernameInput = document.getElementById("usernameInput");
@@ -131,27 +134,28 @@ const chatInput = document.getElementById("chatInput");
 const chatSendBtn = document.getElementById("chatSendBtn");
 const ownerPanel = document.getElementById("ownerPanel");
 const ownerToggleBtn = document.getElementById("ownerToggleBtn");
-const pollArea = document.getElementById("pollArea");
-const abilityTimerDisplay = document.getElementById("abilityTimerDisplay");
 
 const ownerScoreInput = document.getElementById("ownerScoreInput");
 const setScoreBtn = document.getElementById("setScoreBtn");
+const deletePlayerBtn = document.getElementById("deletePlayerBtn");
 const toggleChatBtn = document.getElementById("toggleChatBtn");
 const clearChatBtn = document.getElementById("clearChatBtn");
 const toggleInvisibleBtn = document.getElementById("toggleInvisibleBtn");
+const customInvisTime = document.getElementById("customInvisTime");
 const pollQuestionInput = document.getElementById("pollQuestionInput");
 const pollOptionsInput = document.getElementById("pollOptionsInput");
 const createPollBtn = document.getElementById("createPollBtn");
 const closePollBtn = document.getElementById("closePollBtn");
 const activateAbilityBtn = document.getElementById("activateAbilityBtn");
+const customAbilityTime = document.getElementById("customAbilityTime");
 const toggleAutoCollectBtn = document.getElementById("toggleAutoCollectBtn");
 
-// ---------------- CANVAS ----------------
+// Canvas
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const box = 20;
 
-// ---------------- STATE ----------------
+// Game state
 let username = localStorage.getItem("snake_username") || "";
 let snake = [];
 let food = {};
@@ -163,11 +167,12 @@ let alive = true;
 let invisible = false;
 let autoCollect = false;
 let autoCollectInterval = null;
+let owners = ["PatronMo"];
 let abilityActive = false;
 let abilityEndTime = 0;
 
-// ---------------- UTILS ----------------
-function isOwner(){ return username === "PatronMo"; }
+// --- FUNCTIONS ---
+function isOwner(){ return owners.includes(username); }
 function showAnnouncement(msg){
   const popup = document.getElementById("announcementPopup");
   popup.textContent = msg;
@@ -176,10 +181,13 @@ function showAnnouncement(msg){
 }
 function spawnFood(){ return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
 
-// ---------------- GAME ----------------
 function resetGame(){
-  snake = [{x:10*box, y:10*box}];
-  direction = "RIGHT"; nextDirection = "RIGHT";
+  snake = [
+    {x:10*box, y:10*box},
+    {x:9*box, y:10*box},
+    {x:8*box, y:10*box}
+  ];
+  direction="RIGHT"; nextDirection="RIGHT";
   score = 0;
   alive = true;
   food = spawnFood();
@@ -190,27 +198,19 @@ function resetGame(){
 }
 
 function draw(){
-  direction = nextDirection;
-  ctx.fillStyle="black";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  direction=nextDirection;
+  ctx.fillStyle="black"; ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // Draw food
-  ctx.fillStyle="red";
-  ctx.beginPath();
-  ctx.arc(food.x+box/2, food.y+box/2, box/2,0,Math.PI*2);
-  ctx.fill();
-  ctx.closePath();
+  // Food
+  ctx.fillStyle="red"; ctx.beginPath(); ctx.arc(food.x+box/2,food.y+box/2,box/2,0,Math.PI*2); ctx.fill(); ctx.closePath();
 
-  // Draw snake
+  // Snake
   snake.forEach((s,i)=>{
-    ctx.fillStyle = i===0?"#00ff66":"#00cc55";
-    ctx.beginPath();
-    ctx.arc(s.x+box/2,s.y+box/2,box/2,0,Math.PI*2);
-    ctx.fill();
-    ctx.closePath();
+    ctx.fillStyle=i===0?"#00ff66":"#00cc55";
+    ctx.beginPath(); ctx.arc(s.x+box/2,s.y+box/2,box/2,0,Math.PI*2); ctx.fill(); ctx.closePath();
   });
 
-  // Move snake
+  // Move
   let head = {...snake[0]};
   if(direction==="LEFT") head.x-=box;
   if(direction==="RIGHT") head.x+=box;
@@ -218,26 +218,16 @@ function draw(){
   if(direction==="DOWN") head.y+=box;
 
   // Collision
-  if(!invisible && (head.x<0 || head.y<0 || head.x>=canvas.width || head.y>=canvas.height || snake.some(s=>s.x===head.x&&s.y===head.y))){
-    alive=false;
-    clearInterval(loop);
-    deathText.classList.remove("hidden");
-    return;
+  if(!invisible && (head.x<0 || head.y<0 || head.x>=canvas.width || head.y>=canvas.height || snake.some(s=>s.x===head.x && s.y===head.y))){
+    alive=false; clearInterval(loop); deathText.classList.remove("hidden"); return;
   }
 
-  // Eat food
-  if(head.x===food.x && head.y===food.y){
-    score++;
-    scoreDisplay.textContent = score;
-    snake.unshift(head);
-    food = spawnFood();
-  } else {
-    snake.pop();
-    snake.unshift(head);
-  }
+  // Eat
+  if(head.x===food.x && head.y===food.y){ score++; scoreDisplay.textContent=score; snake.unshift(head); food=spawnFood(); }
+  else snake.pop(), snake.unshift(head);
 }
 
-// ---------------- INPUT ----------------
+// Input
 document.addEventListener("keydown", e=>{
   if(!alive && e.code==="Space"){ resetGame(); e.preventDefault(); }
   if(["ArrowLeft","a"].includes(e.key) && direction!=="RIGHT") nextDirection="LEFT";
@@ -246,150 +236,86 @@ document.addEventListener("keydown", e=>{
   if(["ArrowDown","s"].includes(e.key) && direction!=="UP") nextDirection="DOWN";
 });
 
-// ---------------- AUTO-COLLECT ----------------
+// Auto-collect naive avoidance
 function autoMove(){
   if(!alive) return;
-  const head = snake[0];
-  // naive pathfinding
-  if(head.x<food.x && direction!=="LEFT") nextDirection="RIGHT";
-  else if(head.x>food.x && direction!=="RIGHT") nextDirection="LEFT";
-  else if(head.y<food.y && direction!=="UP") nextDirection="DOWN";
-  else if(head.y>food.y && direction!=="DOWN") nextDirection="UP";
+  const head=snake[0];
+  let moves = [];
+  if(head.x<food.x) moves.push("RIGHT");
+  if(head.x>food.x) moves.push("LEFT");
+  if(head.y<food.y) moves.push("DOWN");
+  if(head.y>food.y) moves.push("UP");
+
+  for(let mv of moves){
+    let test={...head};
+    if(mv==="LEFT") test.x-=box;
+    if(mv==="RIGHT") test.x+=box;
+    if(mv==="UP") test.y-=box;
+    if(mv==="DOWN") test.y+=box;
+    if(test.x>=0 && test.x<canvas.width && test.y>=0 && test.y<canvas.height && !snake.some(s=>s.x===test.x && s.y===test.y)){
+      nextDirection=mv; break;
+    }
+  }
 }
 toggleAutoCollectBtn.addEventListener("click", ()=>{
   if(!isOwner()){ alert("Only PatronMo"); return; }
-  autoCollect = !autoCollect;
+  autoCollect=!autoCollect;
   showAnnouncement("Auto-Collect "+(autoCollect?"Enabled":"Disabled"));
-  if(autoCollect){
-    if(autoCollectInterval) clearInterval(autoCollectInterval);
-    autoCollectInterval = setInterval(autoMove,70);
-  } else clearInterval(autoCollectInterval);
+  if(autoCollect){ autoCollectInterval=setInterval(autoMove,70); } else clearInterval(autoCollectInterval);
 });
 
-// ---------------- OWNER PANEL ----------------
-ownerToggleBtn.addEventListener("click", ()=>{
-  if(!isOwner()){ alert("Not owner"); return; }
-  ownerPanel.style.display = ownerPanel.style.display==="block"?"none":"block";
-});
-setScoreBtn.addEventListener("click", ()=>{
+// Owner panel
+ownerToggleBtn.addEventListener("click", ()=>{ if(!isOwner()){ alert("Not owner"); return; } ownerPanel.style.display=ownerPanel.style.display==="block"?"none":"block"; });
+setScoreBtn.addEventListener("click", ()=>{ if(!isOwner()) return; const val=parseInt(ownerScoreInput.value); if(isNaN(val)||val<=0) return alert("Invalid"); score+=val; scoreDisplay.textContent=score; });
+deletePlayerBtn.addEventListener("click", async ()=>{
   if(!isOwner()) return;
-  const val = parseInt(ownerScoreInput.value);
-  if(isNaN(val) || val<=0) return alert("Invalid");
-  score += val;
-  scoreDisplay.textContent = score;
+  const user = prompt("Username to remove from leaderboard?");
+  if(!user) return;
+  await deleteDoc(doc(db,"scores",user));
+  showAnnouncement(user+" removed from leaderboard!");
 });
-toggleChatBtn.addEventListener("click", ()=>{
-  if(!isOwner()){ alert("Only PatronMo can toggle chat"); return; }
-  if(chatBox.style.display==="none"){ chatBox.style.display="block"; chatInput.style.display="inline"; }
-  else{ chatBox.style.display="none"; chatInput.style.display="none"; }
-});
-clearChatBtn.addEventListener("click", ()=>{
+toggleChatBtn.addEventListener("click", ()=>{ if(!isOwner()){ alert("Only PatronMo"); return; } chatBox.style.display = chatBox.style.display==="none"?"block":"none"; chatInput.style.display = chatBox.style.display; });
+clearChatBtn.addEventListener("click", ()=>{ if(!isOwner()) return; chatBox.innerHTML=""; });
+
+// Invisibility with custom timer
+toggleInvisibleBtn.addEventListener("click", ()=>{
   if(!isOwner()) return;
-  chatBox.innerHTML="";
+  const t=parseInt(customInvisTime.value);
+  if(isNaN(t)||t<=0) return alert("Invalid time");
+  invisible=true; showAnnouncement("Invisibility "+t+"s!");
+  setTimeout(()=>{ invisible=false; showAnnouncement("Invisibility ended"); }, t*1000);
 });
 
-// ---------------- CHAT ----------------
-chatSendBtn.addEventListener("click", async ()=>{
-  const text = chatInput.value.trim();
-  if(!text) return;
-  await addDoc(collection(db,"chatMessages"),{username,message:text,timestamp:Date.now()});
-  chatInput.value="";
-  chatInput.focus();
-});
-
-// ---------------- POLL ----------------
-let poll = null;
-createPollBtn.addEventListener("click", ()=>{
-  if(!isOwner()) return;
-  const q = pollQuestionInput.value.trim();
-  const opts = pollOptionsInput.value.split(",").map(x=>x.trim()).filter(x=>x);
-  if(!q || opts.length<2) return alert("Enter question + 2 options");
-  poll = {question:q, options:opts, votes:{}, open:true};
-  renderPoll();
-});
-closePollBtn.addEventListener("click", ()=>{
-  if(!isOwner()) return;
-  if(poll) poll.open=false;
-  renderPoll();
-});
-function renderPoll(){
-  pollArea.innerHTML="";
-  if(!poll){ pollArea.innerHTML="No active poll"; return; }
-  pollArea.innerHTML=`<b>${poll.question}</b><br>`;
-  poll.options.forEach(opt=>{
-    const btn = document.createElement("button");
-    const count = Object.values(poll.votes).filter(v=>v===opt).length;
-    btn.textContent=`${opt} (${count} votes)`;
-    btn.disabled=!poll.open || poll.votes[username];
-    btn.onclick=()=>{ poll.votes[username]=opt; renderPoll(); };
-    pollArea.appendChild(btn);
-    pollArea.appendChild(document.createElement("br"));
-  });
-  if(!poll.open) pollArea.innerHTML+="<i>Poll closed</i>";
-}
-
-// ---------------- GLOBAL ABILITY (surprise) ----------------
+// Global ability
 activateAbilityBtn.addEventListener("click", ()=>{
   if(!isOwner()) return;
-  abilityActive = true;
-  const dur = 10000; // 10 sec
-  abilityEndTime = Date.now() + dur;
-  showAnnouncement("Global ability activated! Snake is faster & invincible!");
-  let origSpeed = 70;
+  const t=parseInt(customAbilityTime.value);
+  if(isNaN(t)||t<=0) return alert("Invalid time");
+  abilityActive=true; showAnnouncement("Global ability active!");
   clearInterval(loop);
-  loop = setInterval(draw,35); // faster
-  setTimeout(()=>{
-    abilityActive=false;
-    clearInterval(loop);
-    loop = setInterval(draw,70);
-    showAnnouncement("Global ability ended!");
-  }, dur);
+  loop=setInterval(draw,35);
+  setTimeout(()=>{ abilityActive=false; clearInterval(loop); loop=setInterval(draw,70); showAnnouncement("Global ability ended!"); }, t*1000);
 });
 
-// ---------------- START ----------------
+// Start
 startBtn.addEventListener("click", ()=>{
-  const val = usernameInput.value.trim();
+  const val=usernameInput.value.trim();
   if(!val) return alert("Enter username");
-  username = val;
-  localStorage.setItem("snake_username",username);
-  usernameScreen.classList.add("hidden");
-  gameScreen.classList.remove("hidden");
-  playerNameEl.textContent=username;
+  username=val; localStorage.setItem("snake_username",username);
+  usernameScreen.classList.add("hidden"); gameScreen.classList.remove("hidden"); playerNameEl.textContent=username;
   resetGame();
 });
 
-// ---------------- AUTO START ----------------
-if(username){
-  usernameScreen.classList.add("hidden");
-  gameScreen.classList.remove("hidden");
-  playerNameEl.textContent=username;
-  resetGame();
-}
+// Auto start
+if(username){ usernameScreen.classList.add("hidden"); gameScreen.classList.remove("hidden"); playerNameEl.textContent=username; resetGame(); }
 
-// ---------------- FIREBASE LEADERBOARD ----------------
-const leaderboardQuery = query(collection(db,"scores"),orderBy("score","desc"),limit(10));
-onSnapshot(leaderboardQuery,snapshot=>{
-  leaderboard.innerHTML="";
-  snapshot.forEach(doc=>{
-    const data = doc.data();
-    const li = document.createElement("li");
-    li.textContent=`${doc.id}: ${data.score}`;
-    leaderboard.appendChild(li);
-  });
-});
+// Firebase leaderboard
+const leaderboardQuery=query(collection(db,"scores"),orderBy("score","desc"),limit(10));
+onSnapshot(leaderboardQuery,snapshot=>{ leaderboard.innerHTML=""; snapshot.forEach(doc=>{ leaderboard.innerHTML+=`<li>${doc.id}: ${doc.data().score}</li>`; }); });
 
-// ---------------- FIREBASE CHAT ----------------
-const chatQuery = query(collection(db,"chatMessages"),orderBy("timestamp","asc"),limit(50));
-onSnapshot(chatQuery,snapshot=>{
-  chatBox.innerHTML="";
-  snapshot.forEach(doc=>{
-    const m = doc.data();
-    const div = document.createElement("div");
-    div.textContent = `${m.username}: ${m.message}`;
-    chatBox.appendChild(div);
-  });
-  chatBox.scrollTop = chatBox.scrollHeight;
-});
+// Firebase chat
+const chatQuery=query(collection(db,"chatMessages"),orderBy("timestamp","asc"),limit(50));
+onSnapshot(chatQuery,snapshot=>{ chatBox.innerHTML=""; snapshot.forEach(doc=>{ chatBox.innerHTML+=`<div>${doc.data().username}: ${doc.data().message}</div>`; }); chatBox.scrollTop=chatBox.scrollHeight; });
 </script>
 </body>
 </html>
