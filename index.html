@@ -5,275 +5,317 @@
 <title>Snake Game</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body {margin:0;background:#0f0f0f;color:white;font-family:Arial;text-align:center}
-canvas {background:#000;border:3px solid #00ff66;display:block;margin:10px auto}
-.hidden{display:none}
-#ownerPanel{display:none;background:#222;border:2px solid red;padding:10px;margin:10px auto;width:90%;max-width:420px;text-align:left}
-#chatBox{max-height:200px;overflow-y:auto;background:#111;border:2px solid #00ff66;padding:5px;margin:10px auto;width:90%;max-width:420px;text-align:left}
-button{cursor:pointer;padding:6px 10px}
-#announcementPopup{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#ff0;color:#000;padding:10px 20px;font-weight:bold;border-radius:5px;display:none}
+body {margin:0; background:#0f0f0f; color:white; font-family:Arial,sans-serif; text-align:center; overflow-y:auto;}
+canvas {background:#000; border:3px solid #00ff66; display:block; margin:10px auto;}
+.hidden {display:none;}
+.score {font-size:18px; margin:4px 0;}
+.best {color:gold; transition:transform 0.2s;}
+.best.flash {animation: bestFlash 0.4s ease;}
+@keyframes bestFlash {0% {transform:scale(1); color:gold;} 50% {transform:scale(1.3); color:#fff176;} 100% {transform:scale(1); color:gold;}}
+.score-pop {position:absolute; color:#00ff66; font-weight:bold; pointer-events:none; animation:pop 0.6s ease-out forwards;}
+@keyframes pop {0% {opacity:1; transform:translateY(0) scale(1);} 100% {opacity:0; transform:translateY(-25px) scale(1.4);}}
+#chatBox {max-height:250px; overflow-y:auto; background:#111; border:2px solid #00ff66; padding:5px; margin:10px auto; width:90%; max-width:400px; text-align:left;}
+#chatInput {width:65%; padding:5px;}
+button {padding:5px 10px; cursor:pointer;}
+#ownerPanel {display:none; margin:10px auto; border:2px solid red; padding:10px; width:90%; max-width:400px; text-align:left; background:#222;}
+#madeBy {position:absolute; top:5px; left:5px; color:#00ff66; font-weight:bold;}
+#announcementPopup {position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#ff0; color:#000; padding:10px 20px; font-weight:bold; border-radius:5px; display:none; z-index:1000;}
+#ownerToggleBtn {position:fixed; bottom:10px; right:10px; background:red; color:white; font-weight:bold; border:none; border-radius:5px; padding:10px; cursor:pointer;}
+#pollArea button {margin:2px;}
+#abilityTimerDisplay {margin:5px 0; font-weight:bold; color:#0ff;}
 </style>
 </head>
 <body>
-
+<div id="madeBy">Made by PatronMo</div>
 <div id="announcementPopup"></div>
 
-<h1>Snake</h1>
+<h1>🐍 Snake</h1>
 
 <div id="usernameScreen">
-<input id="usernameInput" placeholder="Username">
-<button id="startBtn">Start</button>
+  <p>Choose a username (cannot be changed)</p>
+  <input id="usernameInput" maxlength="12" placeholder="Username">
+  <br>
+  <button id="startBtn">Start</button>
 </div>
 
 <div id="gameScreen" class="hidden">
-<p>Player: <strong id="playerName"></strong></p>
-<p>Score: <span id="scoreDisplay">0</span></p>
+  <p>Player: <strong id="playerName"></strong></p>
+  <p class="score">Score: <strong id="scoreDisplay">0</strong> | Best: <strong id="bestDisplay" class="best">0</strong></p>
+  <canvas id="game" width="400" height="400"></canvas>
+  <p id="deathText" class="hidden">💀 You died — press <b>SPACE</b> to respawn</p>
 
-<canvas id="game" width="400" height="400"></canvas>
+  <h3>🏆 Leaderboard</h3>
+  <ol id="leaderboard"></ol>
 
-<h3>Leaderboard</h3>
-<ol id="leaderboard"></ol>
+  <h3>💬 Global Chat</h3>
+  <div id="chatBox"></div>
+  <input id="chatInput" placeholder="Type a message...">
+  <button id="chatSendBtn">Send</button>
 
-<h3>Chat</h3>
-<div id="chatBox"></div>
-<input id="chatInput">
-<button id="chatSendBtn">Send</button>
+  <h3>📊 Live Poll</h3>
+  <div id="pollArea"></div>
 
-<div id="ownerPanel">
-<h3>Owner Panel</h3>
+  <h3>⏱ Global Ability</h3>
+  <div id="abilityTimerDisplay">Inactive</div>
 
-<input id="ownerUserInput" placeholder="username">
-<button id="giveOwnerBtn">Give Owner</button>
-
-<h4>Timer Announcement</h4>
-<input id="timerSeconds" placeholder="seconds">
-<input id="timerMessage" placeholder="message">
-<button id="startTimerBtn">Start Timer</button>
-
-<h4>Auto Collect</h4>
-<button id="toggleAutoCollectBtn">Toggle</button>
-
+  <div id="ownerPanel">
+    <h3>🛠 Owner Panel</h3>
+    <div>
+      <h4>💯 Adjust Scores</h4>
+      <input id="ownerScoreInput" type="number" placeholder="Add Score">
+      <button id="setScoreBtn">Add Score</button>
+      <button id="deletePlayerBtn">Delete Player</button>
+    </div>
+    <div>
+      <h4>💬 Chat Management</h4>
+      <button id="toggleChatBtn">Toggle Chat</button>
+      <button id="clearChatBtn">Clear Chat</button>
+    </div>
+    <div>
+      <h4>👑 Owner Management</h4>
+      <input id="ownerManageInput" placeholder="Username">
+      <button id="giveOwnerBtn">Give Owner</button>
+      <button id="removeOwnerBtn">Remove Owner</button>
+    </div>
+    <div>
+      <h4>🕶 Invisibility</h4>
+      <button id="toggleInvisibleBtn">Toggle Invisibility</button>
+      <input id="customInvisTime" type="number" placeholder="Seconds">
+    </div>
+    <div>
+      <h4>📊 Poll Controls</h4>
+      <input id="pollQuestionInput" placeholder="Question">
+      <input id="pollOptionsInput" placeholder="Options comma-separated">
+      <button id="createPollBtn">Create Poll</button>
+      <button id="closePollBtn">Close Poll</button>
+    </div>
+    <div>
+      <h4>💥 Global Ability</h4>
+      <input id="customAbilityTime" type="number" placeholder="Seconds">
+      <button id="activateAbilityBtn">Activate Ability</button>
+    </div>
+    <div>
+      <h4>Auto-Collect 🍎</h4>
+      <button id="toggleAutoCollectBtn">Toggle Auto-Collect</button>
+    </div>
+  </div>
 </div>
 
-<button id="ownerToggleBtn">OWNER</button>
-
-</div>
+<button id="ownerToggleBtn">×</button>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, addDoc, getDocs, deleteDoc, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-const firebaseConfig={
-apiKey:"AIzaSyCYOM...",
-authDomain:"snake-game-5205d.firebaseapp.com",
-projectId:"snake-game-5205d"
+const firebaseConfig = {
+  apiKey: "AIzaSyCYOMwhe0SpsEucCwB-cLyiPu6d6GPKWJo",
+  authDomain: "snake-game-5205d.firebaseapp.com",
+  projectId: "snake-game-5205d",
+  storageBucket: "snake-game-5205d.app",
+  messagingSenderId: "669471957796",
+  appId: "1:669471957796:web:5d69121f9a74e696fb49b1",
+  measurementId: "G-75TJWFLDSK"
 };
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-const app=initializeApp(firebaseConfig);
-const db=getFirestore(app);
+// DOM Elements
+const usernameScreen = document.getElementById("usernameScreen");
+const gameScreen = document.getElementById("gameScreen");
+const usernameInput = document.getElementById("usernameInput");
+const startBtn = document.getElementById("startBtn");
+const playerNameEl = document.getElementById("playerName");
+const scoreDisplay = document.getElementById("scoreDisplay");
+const bestDisplay = document.getElementById("bestDisplay");
+const deathText = document.getElementById("deathText");
+const leaderboard = document.getElementById("leaderboard");
+const chatBox = document.getElementById("chatBox");
+const chatInput = document.getElementById("chatInput");
+const chatSendBtn = document.getElementById("chatSendBtn");
+const ownerPanel = document.getElementById("ownerPanel");
+const ownerToggleBtn = document.getElementById("ownerToggleBtn");
 
-// DOM
-const usernameScreen=document.getElementById("usernameScreen");
-const gameScreen=document.getElementById("gameScreen");
-const usernameInput=document.getElementById("usernameInput");
-const startBtn=document.getElementById("startBtn");
-const playerNameEl=document.getElementById("playerName");
-const scoreDisplay=document.getElementById("scoreDisplay");
-const leaderboard=document.getElementById("leaderboard");
-const chatBox=document.getElementById("chatBox");
-const chatInput=document.getElementById("chatInput");
-const chatSendBtn=document.getElementById("chatSendBtn");
-const ownerPanel=document.getElementById("ownerPanel");
-const ownerToggleBtn=document.getElementById("ownerToggleBtn");
-const giveOwnerBtn=document.getElementById("giveOwnerBtn");
-const ownerUserInput=document.getElementById("ownerUserInput");
-const toggleAutoCollectBtn=document.getElementById("toggleAutoCollectBtn");
-const startTimerBtn=document.getElementById("startTimerBtn");
-const timerSeconds=document.getElementById("timerSeconds");
-const timerMessage=document.getElementById("timerMessage");
+const ownerScoreInput = document.getElementById("ownerScoreInput");
+const setScoreBtn = document.getElementById("setScoreBtn");
+const deletePlayerBtn = document.getElementById("deletePlayerBtn");
+const toggleChatBtn = document.getElementById("toggleChatBtn");
+const clearChatBtn = document.getElementById("clearChatBtn");
+const toggleInvisibleBtn = document.getElementById("toggleInvisibleBtn");
+const customInvisTime = document.getElementById("customInvisTime");
+const pollQuestionInput = document.getElementById("pollQuestionInput");
+const pollOptionsInput = document.getElementById("pollOptionsInput");
+const createPollBtn = document.getElementById("createPollBtn");
+const closePollBtn = document.getElementById("closePollBtn");
+const activateAbilityBtn = document.getElementById("activateAbilityBtn");
+const customAbilityTime = document.getElementById("customAbilityTime");
+const toggleAutoCollectBtn = document.getElementById("toggleAutoCollectBtn");
 
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
-const box=20;
+// Canvas
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const box = 20;
 
-// STATE
-let username="";
-let snake=[];
-let food={};
-let score=0;
-let direction="RIGHT";
-let nextDirection="RIGHT";
-let loop;
-let alive=true;
-let autoCollect=false;
-let owners=JSON.parse(localStorage.getItem("owners")||'["PatronMo"]');
+// Game state
+let username = localStorage.getItem("snake_username") || "";
+let snake = [];
+let food = {};
+let score = 0;
+let direction = "RIGHT";
+let nextDirection = "RIGHT";
+let loop = null;
+let alive = true;
+let invisible = false;
+let autoCollect = false;
+let autoCollectInterval = null;
+let owners = ["PatronMo"];
+let abilityActive = false;
+let abilityEndTime = 0;
 
-// UTILS
-function isOwner(){return owners.includes(username);}
+// --- FUNCTIONS ---
+function isOwner(){ return owners.includes(username); }
 function showAnnouncement(msg){
-const el=document.getElementById("announcementPopup");
-el.textContent=msg;
-el.style.display="block";
-setTimeout(()=>el.style.display="none",3000);
+  const popup = document.getElementById("announcementPopup");
+  popup.textContent = msg;
+  popup.style.display="block";
+  setTimeout(()=>popup.style.display="none",2500);
 }
-
-// GAME
-function spawnFood(){
-return {x:Math.floor(Math.random()*20)*box,y:Math.floor(Math.random()*20)*box};
-}
+function spawnFood(){ return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
 
 function resetGame(){
-snake=[
-{x:10*box,y:10*box},
-{x:9*box,y:10*box},
-{x:8*box,y:10*box}
-];
-score=0;
-direction="RIGHT";
-nextDirection="RIGHT";
-food=spawnFood();
-clearInterval(loop);
-loop=setInterval(draw,80);
+  snake = [
+    {x:10*box, y:10*box},
+    {x:9*box, y:10*box},
+    {x:8*box, y:10*box}
+  ];
+  direction="RIGHT"; nextDirection="RIGHT";
+  score = 0;
+  alive = true;
+  food = spawnFood();
+  scoreDisplay.textContent = score;
+  deathText.classList.add("hidden");
+  clearInterval(loop);
+  loop = setInterval(draw,70);
 }
 
 function draw(){
-direction=nextDirection;
+  direction=nextDirection;
+  ctx.fillStyle="black"; ctx.fillRect(0,0,canvas.width,canvas.height);
 
-ctx.fillStyle="black";
-ctx.fillRect(0,0,400,400);
+  // Food
+  ctx.fillStyle="red"; ctx.beginPath(); ctx.arc(food.x+box/2,food.y+box/2,box/2,0,Math.PI*2); ctx.fill(); ctx.closePath();
 
-// food
-ctx.fillStyle="red";
-ctx.fillRect(food.x,food.y,box,box);
+  // Snake
+  snake.forEach((s,i)=>{
+    ctx.fillStyle=i===0?"#00ff66":"#00cc55";
+    ctx.beginPath(); ctx.arc(s.x+box/2,s.y+box/2,box/2,0,Math.PI*2); ctx.fill(); ctx.closePath();
+  });
 
-// snake
-snake.forEach((s,i)=>{
-ctx.fillStyle=i==0?"#00ff66":"#00aa44";
-ctx.fillRect(s.x,s.y,box,box);
+  // Move
+  let head = {...snake[0]};
+  if(direction==="LEFT") head.x-=box;
+  if(direction==="RIGHT") head.x+=box;
+  if(direction==="UP") head.y-=box;
+  if(direction==="DOWN") head.y+=box;
+
+  // Collision
+  if(!invisible && (head.x<0 || head.y<0 || head.x>=canvas.width || head.y>=canvas.height || snake.some(s=>s.x===head.x && s.y===head.y))){
+    alive=false; clearInterval(loop); deathText.classList.remove("hidden"); return;
+  }
+
+  // Eat
+  if(head.x===food.x && head.y===food.y){ score++; scoreDisplay.textContent=score; snake.unshift(head); food=spawnFood(); }
+  else snake.pop(), snake.unshift(head);
+}
+
+// Input
+document.addEventListener("keydown", e=>{
+  if(!alive && e.code==="Space"){ resetGame(); e.preventDefault(); }
+  if(["ArrowLeft","a"].includes(e.key) && direction!=="RIGHT") nextDirection="LEFT";
+  if(["ArrowRight","d"].includes(e.key) && direction!=="LEFT") nextDirection="RIGHT";
+  if(["ArrowUp","w"].includes(e.key) && direction!=="DOWN") nextDirection="UP";
+  if(["ArrowDown","s"].includes(e.key) && direction!=="UP") nextDirection="DOWN";
 });
 
-// move
-let head={...snake[0]};
-if(direction==="LEFT")head.x-=box;
-if(direction==="RIGHT")head.x+=box;
-if(direction==="UP")head.y-=box;
-if(direction==="DOWN")head.y+=box;
-
-// collision
-if(head.x<0||head.y<0||head.x>=400||head.y>=400||snake.some(s=>s.x===head.x&&s.y===head.y)){
-alive=false;clearInterval(loop);return;
-}
-
-// eat
-if(head.x===food.x&&head.y===food.y){
-score++;
-scoreDisplay.textContent=score;
-snake.unshift(head);
-food=spawnFood();
-saveScore();
-}else{
-snake.pop();
-snake.unshift(head);
-}
-}
-
-// AUTO COLLECT SMART
+// Auto-collect naive avoidance
 function autoMove(){
-if(!alive)return;
+  if(!alive) return;
+  const head=snake[0];
+  let moves = [];
+  if(head.x<food.x) moves.push("RIGHT");
+  if(head.x>food.x) moves.push("LEFT");
+  if(head.y<food.y) moves.push("DOWN");
+  if(head.y>food.y) moves.push("UP");
 
-const head=snake[0];
-const dirs=["UP","DOWN","LEFT","RIGHT"];
-
-for(let d of dirs){
-let test={...head};
-if(d==="LEFT")test.x-=box;
-if(d==="RIGHT")test.x+=box;
-if(d==="UP")test.y-=box;
-if(d==="DOWN")test.y+=box;
-
-if(test.x>=0&&test.y>=0&&test.x<400&&test.y<400&&!snake.some(s=>s.x===test.x&&s.y===test.y)){
-nextDirection=d;
-break;
+  for(let mv of moves){
+    let test={...head};
+    if(mv==="LEFT") test.x-=box;
+    if(mv==="RIGHT") test.x+=box;
+    if(mv==="UP") test.y-=box;
+    if(mv==="DOWN") test.y+=box;
+    if(test.x>=0 && test.x<canvas.width && test.y>=0 && test.y<canvas.height && !snake.some(s=>s.x===test.x && s.y===test.y)){
+      nextDirection=mv; break;
+    }
+  }
 }
-}
-}
-
-toggleAutoCollectBtn.onclick=()=>{
-if(!isOwner())return alert("owner only");
-autoCollect=!autoCollect;
-if(autoCollect)setInterval(autoMove,80);
-};
-
-// OWNER PANEL
-ownerToggleBtn.onclick=()=>{
-if(!isOwner())return alert("not owner");
-ownerPanel.style.display=ownerPanel.style.display=="block"?"none":"block";
-};
-
-giveOwnerBtn.onclick=()=>{
-if(!isOwner())return;
-const u=ownerUserInput.value.trim();
-if(!u)return;
-owners.push(u);
-localStorage.setItem("owners",JSON.stringify(owners));
-showAnnouncement(u+" is now owner");
-};
-
-// TIMER
-startTimerBtn.onclick=()=>{
-if(!isOwner())return;
-const sec=parseInt(timerSeconds.value);
-const msg=timerMessage.value;
-if(!sec||!msg)return;
-showAnnouncement("Timer started");
-setTimeout(()=>showAnnouncement(msg),sec*1000);
-};
-
-// INPUT
-document.addEventListener("keydown",e=>{
-if(e.key==="ArrowLeft"&&direction!=="RIGHT")nextDirection="LEFT";
-if(e.key==="ArrowRight"&&direction!=="LEFT")nextDirection="RIGHT";
-if(e.key==="ArrowUp"&&direction!=="DOWN")nextDirection="UP";
-if(e.key==="ArrowDown"&&direction!=="UP")nextDirection="DOWN";
+toggleAutoCollectBtn.addEventListener("click", ()=>{
+  if(!isOwner()){ alert("Only PatronMo"); return; }
+  autoCollect=!autoCollect;
+  showAnnouncement("Auto-Collect "+(autoCollect?"Enabled":"Disabled"));
+  if(autoCollect){ autoCollectInterval=setInterval(autoMove,70); } else clearInterval(autoCollectInterval);
 });
 
-// START
-startBtn.onclick=()=>{
-username=usernameInput.value.trim();
-if(!username)return;
-usernameScreen.classList.add("hidden");
-gameScreen.classList.remove("hidden");
-playerNameEl.textContent=username;
-resetGame();
-};
-
-// FIREBASE
-async function saveScore(){
-await setDoc(doc(db,"scores",username),{score});
-}
-
-const q=query(collection(db,"scores"),orderBy("score","desc"));
-onSnapshot(q,snap=>{
-leaderboard.innerHTML="";
-snap.forEach(d=>{
-leaderboard.innerHTML+=`<li>${d.id}: ${d.data().score}</li>`;
+// Owner panel
+ownerToggleBtn.addEventListener("click", ()=>{ if(!isOwner()){ alert("Not owner"); return; } ownerPanel.style.display=ownerPanel.style.display==="block"?"none":"block"; });
+setScoreBtn.addEventListener("click", ()=>{ if(!isOwner()) return; const val=parseInt(ownerScoreInput.value); if(isNaN(val)||val<=0) return alert("Invalid"); score+=val; scoreDisplay.textContent=score; });
+deletePlayerBtn.addEventListener("click", async ()=>{
+  if(!isOwner()) return;
+  const user = prompt("Username to remove from leaderboard?");
+  if(!user) return;
+  await deleteDoc(doc(db,"scores",user));
+  showAnnouncement(user+" removed from leaderboard!");
 });
+toggleChatBtn.addEventListener("click", ()=>{ if(!isOwner()){ alert("Only PatronMo"); return; } chatBox.style.display = chatBox.style.display==="none"?"block":"none"; chatInput.style.display = chatBox.style.display; });
+clearChatBtn.addEventListener("click", ()=>{ if(!isOwner()) return; chatBox.innerHTML=""; });
+
+// Invisibility with custom timer
+toggleInvisibleBtn.addEventListener("click", ()=>{
+  if(!isOwner()) return;
+  const t=parseInt(customInvisTime.value);
+  if(isNaN(t)||t<=0) return alert("Invalid time");
+  invisible=true; showAnnouncement("Invisibility "+t+"s!");
+  setTimeout(()=>{ invisible=false; showAnnouncement("Invisibility ended"); }, t*1000);
 });
 
-// CHAT
-chatSendBtn.onclick=async ()=>{
-const msg=chatInput.value;
-if(!msg)return;
-await addDoc(collection(db,"chat"),{user:username,msg});
-chatInput.value="";
-};
+// Global ability
+activateAbilityBtn.addEventListener("click", ()=>{
+  if(!isOwner()) return;
+  const t=parseInt(customAbilityTime.value);
+  if(isNaN(t)||t<=0) return alert("Invalid time");
+  abilityActive=true; showAnnouncement("Global ability active!");
+  clearInterval(loop);
+  loop=setInterval(draw,35);
+  setTimeout(()=>{ abilityActive=false; clearInterval(loop); loop=setInterval(draw,70); showAnnouncement("Global ability ended!"); }, t*1000);
+});
 
-onSnapshot(collection(db,"chat"),snap=>{
-chatBox.innerHTML="";
-snap.forEach(d=>{
-chatBox.innerHTML+=`<div>${d.data().user}: ${d.data().msg}</div>`;
+// Start
+startBtn.addEventListener("click", ()=>{
+  const val=usernameInput.value.trim();
+  if(!val) return alert("Enter username");
+  username=val; localStorage.setItem("snake_username",username);
+  usernameScreen.classList.add("hidden"); gameScreen.classList.remove("hidden"); playerNameEl.textContent=username;
+  resetGame();
 });
-});
+
+// Auto start
+if(username){ usernameScreen.classList.add("hidden"); gameScreen.classList.remove("hidden"); playerNameEl.textContent=username; resetGame(); }
+
+// Firebase leaderboard
+const leaderboardQuery=query(collection(db,"scores"),orderBy("score","desc"),limit(10));
+onSnapshot(leaderboardQuery,snapshot=>{ leaderboard.innerHTML=""; snapshot.forEach(doc=>{ leaderboard.innerHTML+=`<li>${doc.id}: ${doc.data().score}</li>`; }); });
+
+// Firebase chat
+const chatQuery=query(collection(db,"chatMessages"),orderBy("timestamp","asc"),limit(50));
+onSnapshot(chatQuery,snapshot=>{ chatBox.innerHTML=""; snapshot.forEach(doc=>{ chatBox.innerHTML+=`<div>${doc.data().username}: ${doc.data().message}</div>`; }); chatBox.scrollTop=chatBox.scrollHeight; });
 </script>
 </body>
 </html>
