@@ -1,3 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snake Game</title>
+<style>
+/* Je CSS hier */
+</style>
+</head>
+<body>
+<div id="usernameScreen">
+  <input id="usernameInput" placeholder="Username">
+  <button id="startBtn">Start</button>
+</div>
+
+<div id="gameScreen" style="display:none;">
+  <canvas id="game" width="400" height="400"></canvas>
+  <p id="scoreDisplay">0</p>
+  <p id="playerName"></p>
+
+  <div id="ownerPanel" style="display:none;">
+    <input id="ownerPlayerInput" placeholder="Score / Username">
+    <button id="setScoreBtn">Add Score</button>
+    <button id="deletePlayerBtn">Reset Score</button>
+    <button id="clearChatBtn">Clear Chat</button>
+    <input id="announcementInput" placeholder="Announcement">
+    <button id="sendAnnouncementBtn">Send Announcement</button>
+  </div>
+
+  <div id="pollArea"></div>
+  <input id="pollQuestionInput" placeholder="Poll Question">
+  <input id="pollOptionsInput" placeholder="Option1, Option2,...">
+  <button id="createPollBtn">Create Poll</button>
+  <button id="closePollBtn">Close Poll</button>
+
+  <button id="toggleAutoCollectBtn">Toggle Auto-Collect</button>
+  <div id="announcementPopup"></div>
+  <div id="chatBox"></div>
+  <input id="chatInput">
+  <button id="chatSendBtn">Send</button>
+  <button id="toggleChatBtn">Toggle Chat</button>
+</div>
+
+<script>
 // ---------------- DOM -----------------
 const usernameScreen = document.getElementById("usernameScreen");
 const gameScreen = document.getElementById("gameScreen");
@@ -242,3 +286,7 @@ if(username){
     playerNameEl.textContent=username;
     resetGame();
 }
+
+</script>
+</body>
+</html>
