@@ -41,7 +41,6 @@ canvas {background:#000; border:3px solid #00ff66; display:block; margin:10px au
 
   <div id="ownerPanel">
     <h3>🛠 Owner Panel</h3>
-
     <h4>💯 Adjust Scores</h4>
     <input id="ownerScoreInput" type="number" placeholder="Add Score">
     <button id="setScoreBtn">Add Score</button>
@@ -63,7 +62,7 @@ canvas {background:#000; border:3px solid #00ff66; display:block; margin:10px au
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCYOMwhe0SpsEucCwB-cLyiPu6d6GPKWJo",
@@ -113,7 +112,6 @@ let autoCollect = false;
 let autoInterval = null;
 
 let owners = ["PatronMo"];
-
 function isOwner(){ return owners.includes(username); }
 
 function showAnnouncement(msg){
@@ -161,9 +159,7 @@ function draw(){
     if(abilityActive){
       ctx.shadowBlur = 15;
       ctx.shadowColor = "#00ffcc";
-    } else {
-      ctx.shadowBlur = 0;
-    }
+    } else { ctx.shadowBlur=0; }
     ctx.fillStyle=i===0?"#00ff66":"#00cc55";
     ctx.beginPath();
     ctx.arc(s.x+box/2,s.y+box/2,box/2,0,Math.PI*2);
@@ -176,6 +172,15 @@ function draw(){
   if(direction==="UP") head.y-=box;
   if(direction==="DOWN") head.y+=box;
 
+  // WALL WRAP IF INVISIBLE
+  if(invisible){
+    if(head.x<0) head.x=canvas.width-box;
+    if(head.x>=canvas.width) head.x=0;
+    if(head.y<0) head.y=canvas.height-box;
+    if(head.y>=canvas.height) head.y=0;
+  }
+
+  // NORMAL COLLISION
   if(!invisible && (
     head.x<0 || head.y<0 ||
     head.x>=canvas.width || head.y>=canvas.height ||
@@ -215,7 +220,6 @@ setScoreBtn.addEventListener("click", ()=>{
 
   score+=val;
   scoreDisplay.textContent=score;
-
   for(let i=0;i<val;i++){
     const tail = snake[snake.length-1];
     snake.push({...tail});
@@ -253,38 +257,84 @@ activateAbilityBtn.addEventListener("click", ()=>{
   }, t*1000);
 });
 
-// SMART AUTO COLLECT
-function isSafe(x,y){
-  return (
-    x>=0 && x<canvas.width &&
-    y>=0 && y<canvas.height &&
-    !snake.some(s=>s.x===x && s.y===y)
-  );
+// AUTO COLLECT SMART AI
+function getNeighbors(node){
+  return [
+    {x:node.x-box,y:node.y,dir:"LEFT"},
+    {x:node.x+box,y:node.y,dir:"RIGHT"},
+    {x:node.x,y:node.y-box,dir:"UP"},
+    {x:node.x,y:node.y+box,dir:"DOWN"},
+  ];
 }
-
+function isSafeFuture(x,y,snakeBody){
+  return x>=0 && x<canvas.width && y>=0 && y<canvas.height && !snakeBody.some(s=>s.x===x && s.y===y);
+}
+function findPathToFood(){
+  const queue=[{x:snake[0].x,y:snake[0].y,path:[]}];
+  const visited=new Set();
+  while(queue.length){
+    const node=queue.shift();
+    const key=node.x+","+node.y;
+    if(visited.has(key)) continue;
+    visited.add(key);
+    if(node.x===food.x && node.y===food.y) return node.path;
+    for(const n of getNeighbors(node)){
+      if(isSafeFuture(n.x,n.y,snake)){
+        queue.push({x:n.x,y:n.y,path:[...node.path,n.dir]});
+      }
+    }
+  }
+  return null;
+}
+function followTail(){
+  const tail=snake[snake.length-1];
+  const queue=[{x:snake[0].x,y:snake[0].y,path:[]}];
+  const visited=new Set();
+  while(queue.length){
+    const node=queue.shift();
+    const key=node.x+","+node.y;
+    if(visited.has(key)) continue;
+    visited.add(key);
+    if(node.x===tail.x && node.y===tail.y) return node.path;
+    for(const n of getNeighbors(node)){
+      if(isSafeFuture(n.x,n.y,snake)){
+        queue.push({x:n.x,y:n.y,path:[...node.path,n.dir]});
+      }
+    }
+  }
+  return null;
+}
+function countOpenArea(x,y){
+  let count=0;
+  const visited=new Set();
+  const queue=[{x,y}];
+  while(queue.length && count<100){
+    const node=queue.shift();
+    const key=node.x+","+node.y;
+    if(visited.has(key)) continue;
+    visited.add(key);
+    if(!isSafeFuture(node.x,node.y,snake)) continue;
+    count++;
+    for(const n of getNeighbors(node)){
+      queue.push({x:n.x,y:n.y});
+    }
+  }
+  return count;
+}
 function autoMove(){
   if(!alive) return;
-
-  const head = snake[0];
-  const moves = [
-    {dir:"LEFT", x:head.x-box, y:head.y},
-    {dir:"RIGHT", x:head.x+box, y:head.y},
-    {dir:"UP", x:head.x, y:head.y-box},
-    {dir:"DOWN", x:head.x, y:head.y+box},
-  ];
-
-  // safe moves only
-  const safeMoves = moves.filter(m=>isSafe(m.x,m.y));
-  if(safeMoves.length===0) return;
-
-  // choose closest to food
-  safeMoves.sort((a,b)=>{
-    const da=Math.abs(a.x-food.x)+Math.abs(a.y-food.y);
-    const db=Math.abs(b.x-food.x)+Math.abs(b.y-food.y);
-    return da-db;
-  });
-
-  nextDirection=safeMoves[0].dir;
+  let path=findPathToFood();
+  if(!path || path.length===0) path=followTail();
+  if(!path || path.length===0){
+    const head=snake[0];
+    const moves=getNeighbors(head).filter(m=>isSafeFuture(m.x,m.y,snake));
+    if(moves.length){
+      moves.sort((a,b)=>countOpenArea(b.x,b.y)-countOpenArea(a.x,a.y));
+      nextDirection=moves[0].dir;
+      return;
+    }
+  }
+  if(path && path.length) nextDirection=path[0];
 }
 
 toggleAutoCollectBtn.addEventListener("click", ()=>{
