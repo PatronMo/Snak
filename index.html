@@ -2,48 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Smooth Smart Snake</title>
+<title>Snake PRO AI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-    body{
-        margin:0;
-        background:#0f0f0f;
-        color:white;
-        font-family:Arial, sans-serif;
-        text-align:center;
-    }
-    h1{
-        margin:10px 0;
-        font-weight:600;
-        letter-spacing:1px;
-    }
-    canvas{
-        background:#000;
-        border:3px solid #00ff88;
-        box-shadow:0 0 20px #00ff8855;
-        border-radius:12px;
-        margin-top:10px;
-    }
-    button{
-        margin:10px;
-        padding:12px 20px;
-        border-radius:10px;
-        border:none;
-        font-size:16px;
-        font-weight:600;
-        cursor:pointer;
-        background:#00ff88;
-        color:black;
-        transition:0.2s;
-    }
-    button:hover{
-        transform:scale(1.05);
-    }
+body{
+    margin:0;
+    background:#0f0f0f;
+    color:white;
+    font-family:Arial,sans-serif;
+    text-align:center;
+}
+h1{margin:10px;}
+canvas{
+    background:#000;
+    border:3px solid #00ff88;
+    border-radius:12px;
+    box-shadow:0 0 25px #00ff8844;
+}
+button{
+    margin:10px;
+    padding:10px 18px;
+    font-size:15px;
+    border:none;
+    border-radius:10px;
+    font-weight:600;
+    background:#00ff88;
+    cursor:pointer;
+}
 </style>
 </head>
 <body>
 
-<h1>Smooth Snake — Smart Auto Collect</h1>
+<h1>Snake PRO — Smart Auto Collect</h1>
 <button id="autoBtn">Auto Collect: OFF</button>
 <div>Score: <span id="score">0</span></div>
 <canvas id="game" width="600" height="600"></canvas>
@@ -54,88 +44,82 @@ const ctx = canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
 const autoBtn = document.getElementById("autoBtn");
 
-let autoMode = false;
-autoBtn.onclick = () => {
-    autoMode = !autoMode;
-    autoBtn.textContent = "Auto Collect: " + (autoMode ? "ON" : "OFF");
+let autoMode=false;
+autoBtn.onclick=()=>{
+    autoMode=!autoMode;
+    autoBtn.textContent="Auto Collect: "+(autoMode?"ON":"OFF");
 };
 
-const size = 20;
-const tileCount = canvas.width / size;
+const size=20;
+const tiles=canvas.width/size;
 
-let snake = [{x:10, y:10}];
-let dir = {x:1, y:0};
-let nextDir = dir;
-let food = spawnFood();
-let score = 0;
+let snake=[{x:10,y:10}];
+let dir={x:1,y:0};
+let nextDir=dir;
+let food=spawnFood();
+let score=0;
 
-let speed = 4;        // was 8
-const step = 1/12;    // was 1/15
-let lastTime = 0;
-let accumulator = 0;
-const step = 1/15;
+let speed=6;           // FIXED balanced speed
+let moveTimer=0;
+let moveInterval=120;  // ms per move (smooth + controllable)
 
 function spawnFood(){
-    return {
-        x: Math.floor(Math.random()*tileCount),
-        y: Math.floor(Math.random()*tileCount)
-    };
+    let f;
+    do{
+        f={
+            x:Math.floor(Math.random()*tiles),
+            y:Math.floor(Math.random()*tiles)
+        };
+    }while(snake.some(s=>s.x===f.x&&s.y===f.y));
+    return f;
 }
 
-document.addEventListener("keydown", e=>{
-    if(e.key==="ArrowUp" && dir.y!==1) nextDir={x:0,y:-1};
-    if(e.key==="ArrowDown" && dir.y!==-1) nextDir={x:0,y:1};
-    if(e.key==="ArrowLeft" && dir.x!==1) nextDir={x:-1,y:0};
-    if(e.key==="ArrowRight" && dir.x!==-1) nextDir={x:1,y:0};
+document.addEventListener("keydown",e=>{
+    if(e.key==="ArrowUp"&&dir.y!==1) nextDir={x:0,y:-1};
+    if(e.key==="ArrowDown"&&dir.y!==-1) nextDir={x:0,y:1};
+    if(e.key==="ArrowLeft"&&dir.x!==1) nextDir={x:-1,y:0};
+    if(e.key==="ArrowRight"&&dir.x!==-1) nextDir={x:1,y:0};
 });
 
 function gameLoop(time){
-    const delta = (time-lastTime)/1000;
-    lastTime = time;
-    accumulator += delta*speed;
+    moveTimer+=time-lastTime;
+    lastTime=time;
 
-    while(accumulator > step){
+    if(moveTimer>moveInterval){
         update();
-        accumulator -= step;
+        moveTimer=0;
     }
 
     draw();
     requestAnimationFrame(gameLoop);
 }
 
+let lastTime=0;
+
 function update(){
-    if(autoMode) smartAI();
+    if(autoMode) aiMove();
 
-    dir = nextDir;
+    dir=nextDir;
 
-    const head = {
-        x: snake[0].x + dir.x,
-        y: snake[0].y + dir.y
+    const head={
+        x:snake[0].x+dir.x,
+        y:snake[0].y+dir.y
     };
 
-    // wall collision
-    if(head.x<0||head.y<0||head.x>=tileCount||head.y>=tileCount){
-        reset();
-        return;
-    }
+    if(head.x<0||head.y<0||head.x>=tiles||head.y>=tiles) return reset();
 
-    // self collision
-    for(let s of snake){
-        if(head.x===s.x && head.y===s.y){
-            reset();
-            return;
-        }
-    }
+    if(snake.some(s=>s.x===head.x&&s.y===head.y)) return reset();
 
     snake.unshift(head);
 
-    // eat
-    if(head.x===food.x && head.y===food.y){
+    if(head.x===food.x&&head.y===food.y){
         score++;
-        speed += 0.2;
-        scoreEl.textContent = score;
-        food = spawnFood();
-    } else {
+        scoreEl.textContent=score;
+        food=spawnFood();
+
+        // slow controlled acceleration
+        if(moveInterval>70) moveInterval-=2;
+    }else{
         snake.pop();
     }
 }
@@ -145,110 +129,130 @@ function reset(){
     dir={x:1,y:0};
     nextDir=dir;
     score=0;
-    speed=8;
+    moveInterval=120;
     scoreEl.textContent=score;
 }
 
 function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // food glow
     ctx.fillStyle="#ff0044";
-    ctx.beginPath();
-    ctx.arc(food.x*size+size/2, food.y*size+size/2, size/2, 0, Math.PI*2);
-    ctx.fill();
+    ctx.fillRect(food.x*size,food.y*size,size,size);
 
-    // snake smooth gradient
     snake.forEach((s,i)=>{
-        const alpha = 1 - (i/snake.length)*0.6;
-        ctx.fillStyle = `rgba(0,255,136,${alpha})`;
-        ctx.fillRect(s.x*size, s.y*size, size, size);
+        const alpha=1-(i/snake.length)*0.6;
+        ctx.fillStyle=`rgba(0,255,136,${alpha})`;
+        ctx.fillRect(s.x*size,s.y*size,size,size);
     });
 }
 
-// ---------------- SMART AUTO AI ----------------
+/* ============================
+   PRO AI (A* + survival logic)
+   ============================ */
 
-// Predict safe moves using scoring system
-function smartAI(){
-    const head = snake[0];
+function aiMove(){
+    const path=findPath(snake[0],food);
 
-    const options = [
+    if(path && path.length>1){
+        const next=path[1];
+        nextDir={x:next.x-snake[0].x,y:next.y-snake[0].y};
+        return;
+    }
+
+    // if no safe food path -> follow tail survival
+    const tail=snake[snake.length-1];
+    const tailPath=findPath(snake[0],tail,true);
+
+    if(tailPath && tailPath.length>1){
+        const next=tailPath[1];
+        nextDir={x:next.x-snake[0].x,y:next.y-snake[0].y};
+        return;
+    }
+
+    // fallback safe move
+    safeMove();
+}
+
+function safeMove(){
+    const options=[
         {x:0,y:-1},
         {x:0,y:1},
         {x:-1,y:0},
         {x:1,y:0}
     ];
 
-    let bestMove = dir;
-    let bestScore = -999999;
-
     for(let opt of options){
-        if(opt.x===-dir.x && opt.y===-dir.y) continue;
+        const nx=snake[0].x+opt.x;
+        const ny=snake[0].y+opt.y;
 
-        const nx = head.x + opt.x;
-        const ny = head.y + opt.y;
+        if(nx<0||ny<0||nx>=tiles||ny>=tiles) continue;
+        if(snake.some(s=>s.x===nx&&s.y===ny)) continue;
 
-        // avoid wall
-        if(nx<0||ny<0||nx>=tileCount||ny>=tileCount) continue;
+        nextDir=opt;
+        return;
+    }
+}
 
-        // avoid body
-        let hitsBody = snake.some(s=>s.x===nx && s.y===ny);
-        if(hitsBody) continue;
+function findPath(start,target,ignoreTail=false){
+    const open=[start];
+    const cameFrom={};
+    const gScore={};
+    const fScore={};
 
-        // scoring
-        let score = 0;
+    const key=p=>p.x+","+p.y;
 
-        // distance to food (prefer closer)
-        const dist = Math.abs(food.x-nx) + Math.abs(food.y-ny);
-        score -= dist * 5;
+    gScore[key(start)]=0;
+    fScore[key(start)]=heuristic(start,target);
 
-        // prefer open space (lookahead)
-        score += floodFillSpace(nx,ny)*2;
+    while(open.length){
+        open.sort((a,b)=>fScore[key(a)]-fScore[key(b)]);
+        const current=open.shift();
 
-        // avoid tight corridors
-        score -= nearbyBodyPenalty(nx,ny);
+        if(current.x===target.x&&current.y===target.y){
+            return reconstructPath(cameFrom,current);
+        }
 
-        if(score > bestScore){
-            bestScore = score;
-            bestMove = opt;
+        const neighbors=[
+            {x:current.x+1,y:current.y},
+            {x:current.x-1,y:current.y},
+            {x:current.x,y:current.y+1},
+            {x:current.x,y:current.y-1}
+        ];
+
+        for(let n of neighbors){
+            if(n.x<0||n.y<0||n.x>=tiles||n.y>=tiles) continue;
+
+            if(!ignoreTail){
+                if(snake.some(s=>s.x===n.x&&s.y===n.y)) continue;
+            }else{
+                if(snake.slice(0,-1).some(s=>s.x===n.x&&s.y===n.y)) continue;
+            }
+
+            const tentative=gScore[key(current)]+1;
+
+            if(tentative < (gScore[key(n)] ?? Infinity)){
+                cameFrom[key(n)]=current;
+                gScore[key(n)]=tentative;
+                fScore[key(n)]=tentative+heuristic(n,target);
+
+                if(!open.some(o=>o.x===n.x&&o.y===n.y)) open.push(n);
+            }
         }
     }
-
-    nextDir = bestMove;
+    return null;
 }
 
-// check available space from position (smart survival)
-function floodFillSpace(x,y){
-    const visited = new Set();
-    const stack = [{x,y}];
-    let count = 0;
-
-    while(stack.length && count < 80){
-        const node = stack.pop();
-        const key = node.x+","+node.y;
-        if(visited.has(key)) continue;
-        visited.add(key);
-
-        if(node.x<0||node.y<0||node.x>=tileCount||node.y>=tileCount) continue;
-        if(snake.some(s=>s.x===node.x && s.y===node.y)) continue;
-
-        count++;
-
-        stack.push({x:node.x+1,y:node.y});
-        stack.push({x:node.x-1,y:node.y});
-        stack.push({x:node.x,y:node.y+1});
-        stack.push({x:node.x,y:node.y-1});
+function reconstructPath(cameFrom,current){
+    const path=[current];
+    while(cameFrom[current.x+","+current.y]){
+        current=cameFrom[current.x+","+current.y];
+        path.unshift(current);
     }
-    return count;
+    return path;
 }
 
-function nearbyBodyPenalty(x,y){
-    let penalty=0;
-    snake.forEach(s=>{
-        const d = Math.abs(s.x-x)+Math.abs(s.y-y);
-        if(d===1) penalty+=8;
-    });
-    return penalty;
+function heuristic(a,b){
+    return Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
 }
 
 requestAnimationFrame(gameLoop);
