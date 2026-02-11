@@ -2,257 +2,255 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Snake Game Leveling</title>
+<title>Smooth Smart Snake</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body {margin:0; background:#0f0f0f; color:white; font-family:Arial,sans-serif; text-align:center;}
-canvas {background:#000; border:3px solid #00ff66; display:block; margin:10px auto;}
-.hidden {display:none;}
-.score, #levelDisplay, #xpDisplay {font-size:18px; margin:4px 0;}
-.best {color:gold;}
-#ownerPanel {display:none; margin:10px auto; border:2px solid red; padding:10px; width:90%; max-width:400px; text-align:left; background:#222;}
-#madeBy {position:absolute; top:5px; left:5px; color:#00ff66; font-weight:bold;}
-#announcementPopup {position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#ff0; color:#000; padding:10px 20px; font-weight:bold; border-radius:5px; display:none; z-index:1000;}
-#ownerToggleBtn {position:fixed; bottom:10px; right:10px; background:red; color:white; font-weight:bold; border:none; border-radius:5px; padding:10px; cursor:pointer;}
-#commandBar {margin:10px auto;}
-#commandInput {padding:5px 10px; border-radius:5px; border:none;}
-#commandBtn {padding:5px 10px; border-radius:5px; border:none; background:#0f0; color:#000; cursor:pointer;}
+    body{
+        margin:0;
+        background:#0f0f0f;
+        color:white;
+        font-family:Arial, sans-serif;
+        text-align:center;
+    }
+    h1{
+        margin:10px 0;
+        font-weight:600;
+        letter-spacing:1px;
+    }
+    canvas{
+        background:#000;
+        border:3px solid #00ff88;
+        box-shadow:0 0 20px #00ff8855;
+        border-radius:12px;
+        margin-top:10px;
+    }
+    button{
+        margin:10px;
+        padding:12px 20px;
+        border-radius:10px;
+        border:none;
+        font-size:16px;
+        font-weight:600;
+        cursor:pointer;
+        background:#00ff88;
+        color:black;
+        transition:0.2s;
+    }
+    button:hover{
+        transform:scale(1.05);
+    }
 </style>
 </head>
 <body>
 
-<div id="madeBy">Made by PatronMo</div>
-<div id="announcementPopup"></div>
+<h1>Smooth Snake — Smart Auto Collect</h1>
+<button id="autoBtn">Auto Collect: OFF</button>
+<div>Score: <span id="score">0</span></div>
+<canvas id="game" width="600" height="600"></canvas>
 
-<h1>🐍 Snake</h1>
-
-<div id="usernameScreen">
-  <p>Choose a username (cannot be changed)</p>
-  <input id="usernameInput" maxlength="12" placeholder="Username">
-  <br>
-  <button id="startBtn">Start</button>
-</div>
-
-<div id="gameScreen" class="hidden">
-  <p>Player: <strong id="playerName"></strong></p>
-  <p class="score">Score: <strong id="scoreDisplay">0</strong></p>
-  <p id="levelDisplay">Level: 1</p>
-  <p id="xpDisplay">XP: 0 / 5</p>
-  <canvas id="game" width="400" height="400"></canvas>
-  <p id="deathText" class="hidden">💀 You died — press <b>SPACE</b> to respawn</p>
-
-  <h3>🏆 Leaderboard</h3>
-  <ol id="leaderboard"></ol>
-
-  <div id="commandBar">
-    <input id="commandInput" placeholder="Enter command">
-    <button id="commandBtn">Go</button>
-  </div>
-
-  <div id="ownerPanel">
-    <h3>🛠 Owner Panel</h3>
-    <button id="toggleAutoCollectBtn">Toggle Auto-Collect</button>
-    <button id="toggleInvisibleBtn">Toggle Invisibility</button>
-  </div>
-</div>
-
-<button id="ownerToggleBtn" class="hidden">Owner Panel</button>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-import { getFirestore, collection, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCYOMwhe0SpsEucCwB-cLyiPu6d6GPKWJo",
-  authDomain: "snake-game-5205d.firebaseapp.com",
-  projectId: "snake-game-5205d",
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// DOM
+<script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const playerNameEl = document.getElementById("playerName");
-const scoreDisplay = document.getElementById("scoreDisplay");
-const levelDisplay = document.getElementById("levelDisplay");
-const xpDisplay = document.getElementById("xpDisplay");
-const deathText = document.getElementById("deathText");
-const leaderboard = document.getElementById("leaderboard");
-const ownerPanel = document.getElementById("ownerPanel");
-const ownerToggleBtn = document.getElementById("ownerToggleBtn");
-const announcementPopup = document.getElementById("announcementPopup");
-const toggleAutoCollectBtn = document.getElementById("toggleAutoCollectBtn");
-const toggleInvisibleBtn = document.getElementById("toggleInvisibleBtn");
+const scoreEl = document.getElementById("score");
+const autoBtn = document.getElementById("autoBtn");
 
-// Command bar
-const commandInput = document.getElementById("commandInput");
-const commandBtn = document.getElementById("commandBtn");
+let autoMode = false;
+autoBtn.onclick = () => {
+    autoMode = !autoMode;
+    autoBtn.textContent = "Auto Collect: " + (autoMode ? "ON" : "OFF");
+};
 
-// Game state
-const box=20;
-let username=localStorage.getItem("snake_username")||"";
-let snake=[], food={}, score=0;
-let direction="RIGHT", nextDirection="RIGHT", loop=null;
-let alive=true, invisible=false, abilityActive=false;
-let autoCollect=false, autoInterval=null;
-let owners=["PatronMo"];
-let xp = parseInt(localStorage.getItem("snake_xp")||0);
-let level = parseInt(localStorage.getItem("snake_level")||1);
-let xpToNext = 5;
-let boostActive=false, boostTimeout=null;
+const size = 20;
+const tileCount = canvas.width / size;
 
-// Load saved score
-score = parseInt(localStorage.getItem("snake_score")||0);
+let snake = [{x:10, y:10}];
+let dir = {x:1, y:0};
+let nextDir = dir;
+let food = spawnFood();
+let score = 0;
 
-// Helper functions
-function isOwner(){ return owners.includes(username); }
-function showAnnouncement(msg){
-  announcementPopup.textContent=msg;
-  announcementPopup.style.display="block";
-  setTimeout(()=>announcementPopup.style.display="none",2500);
-}
-function spawnFood(){ return {x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box}; }
-function saveProgress(){
-  localStorage.setItem("snake_username",username);
-  localStorage.setItem("snake_score",score);
-  localStorage.setItem("snake_xp",xp);
-  localStorage.setItem("snake_level",level);
-}
-function updateXPDisplay(){
-  xpDisplay.textContent = `XP: ${xp} / ${xpToNext}`;
-  levelDisplay.textContent = `Level: ${level}`;
+let speed = 8;
+let lastTime = 0;
+let accumulator = 0;
+const step = 1/15;
+
+function spawnFood(){
+    return {
+        x: Math.floor(Math.random()*tileCount),
+        y: Math.floor(Math.random()*tileCount)
+    };
 }
 
-// Level up function
-function levelUp(){
-  level++;
-  xp=0;
-  xpToNext = Math.floor(xpToNext*1.5 + (level>10?5:0)); // harder after 10
-  saveProgress();
-  showAnnouncement("Level up! Level "+level);
-  if(level%10===0){
-    activateBoost();
-  }
-  updateXPDisplay();
-}
-
-// Boost function
-function activateBoost(){
-  boostActive=true;
-  showAnnouncement("3x BOOST ACTIVE for 5 min!");
-  if(boostTimeout) clearTimeout(boostTimeout);
-  boostTimeout=setTimeout(()=>{
-    boostActive=false;
-    showAnnouncement("3x BOOST ENDED");
-  },5*60*1000);
-}
-
-// Reset game
-function resetGame(){
-  snake=[{x:10*box,y:10*box},{x:9*box,y:10*box},{x:8*box,y:10*box}];
-  direction="RIGHT"; nextDirection="RIGHT"; alive=true; food=spawnFood();
-  scoreDisplay.textContent=score; deathText.classList.add("hidden");
-  clearInterval(loop); loop=setInterval(draw,70);
-}
-
-// Draw
-function draw(){
-  direction=nextDirection;
-  ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="red"; ctx.fillRect(food.x,food.y,box,box);
-  snake.forEach((s,i)=>{
-    ctx.fillStyle=i===0?"#0f0":"#0a0";
-    ctx.fillRect(s.x,s.y,box,box);
-  });
-
-  let head={...snake[0]};
-  if(direction==="LEFT") head.x-=box;
-  if(direction==="RIGHT") head.x+=box;
-  if(direction==="UP") head.y-=box;
-  if(direction==="DOWN") head.y+=box;
-
-  if(invisible){
-    if(head.x<0) head.x=canvas.width-box;
-    if(head.x>=canvas.width) head.x=0;
-    if(head.y<0) head.y=canvas.height-box;
-    if(head.y>=canvas.height) head.y=0;
-  }
-
-  if(!invisible && (head.x<0 || head.y<0 || head.x>=canvas.width || head.y>=canvas.height || snake.some(s=>s.x===head.x && s.y===head.y))){
-    alive=false; clearInterval(loop); deathText.classList.remove("hidden"); saveProgress(); return;
-  }
-
-  // Eat food
-  if(head.x===food.x && head.y===food.y){
-    let segmentsToAdd = boostActive?3:1;
-    let points = boostActive?3:1;
-    score+=points; scoreDisplay.textContent=score;
-    for(let i=0;i<segmentsToAdd;i++) snake.unshift(head);
-    xp+=1; 
-    if(xp>=xpToNext) levelUp();
-    saveProgress();
-    food=spawnFood();
-  } else { snake.pop(); snake.unshift(head); }
-
-  updateXPDisplay();
-}
-
-// Key input
 document.addEventListener("keydown", e=>{
-  if(!alive && e.code==="Space"){ resetGame(); return; }
-  if(e.key==="ArrowLeft" && direction!=="RIGHT") nextDirection="LEFT";
-  if(e.key==="ArrowRight" && direction!=="LEFT") nextDirection="RIGHT";
-  if(e.key==="ArrowUp" && direction!=="DOWN") nextDirection="UP";
-  if(e.key==="ArrowDown" && direction!=="UP") nextDirection="DOWN";
+    if(e.key==="ArrowUp" && dir.y!==1) nextDir={x:0,y:-1};
+    if(e.key==="ArrowDown" && dir.y!==-1) nextDir={x:0,y:1};
+    if(e.key==="ArrowLeft" && dir.x!==1) nextDir={x:-1,y:0};
+    if(e.key==="ArrowRight" && dir.x!==-1) nextDir={x:1,y:0};
 });
 
-// Ultra-smart auto-collect
-function getNeighbors(node){ return [{x:node.x-box,y:node.y,dir:"LEFT"},{x:node.x+box,y:node.y,dir:"RIGHT"},{x:node.x,y:node.y-box,dir:"UP"},{x:node.x,y:node.y+box,dir:"DOWN"}]; }
-function isSafeFuture(x,y,body){ return x>=0 && x<canvas.width && y>=0 && y<canvas.height && !body.some(s=>s.x===x && s.y===y); }
-function bfsPath(start,target,body){
-  const queue=[{x:start.x,y:start.y,path:[]}], visited=new Set();
-  while(queue.length){
-    const node=queue.shift(); const key=node.x+","+node.y;
-    if(visited.has(key)) continue; visited.add(key);
-    if(node.x===target.x && node.y===target.y) return node.path;
-    for(const n of getNeighbors(node)) if(isSafeFuture(n.x,n.y,body)) queue.push({x:n.x,y:n.y,path:[...node.path,n.dir]});
-  }
-  return null;
+function gameLoop(time){
+    const delta = (time-lastTime)/1000;
+    lastTime = time;
+    accumulator += delta*speed;
+
+    while(accumulator > step){
+        update();
+        accumulator -= step;
+    }
+
+    draw();
+    requestAnimationFrame(gameLoop);
 }
-function followTail(){ return bfsPath(snake[0],snake[snake.length-1],snake); }
-function countOpenArea(x,y){ let count=0; const visited=new Set(); const queue=[{x,y}]; while(queue.length && count<100){ const node=queue.shift(); const key=node.x+","+node.y; if(visited.has(key)) continue; visited.add(key); if(!isSafeFuture(node.x,node.y,snake)) continue; count++; for(const n of getNeighbors(node)) queue.push({x:n.x,y:n.y}); } return count; }
-function autoMove(){ if(!alive) return; let path=bfsPath(snake[0],food,snake); if(!path||path.length===0) path=followTail(); if(!path||path.length===0){ const head=snake[0]; const moves=getNeighbors(head).filter(m=>isSafeFuture(m.x,m.y,snake)); if(moves.length){ moves.sort((a,b)=>countOpenArea(b.x,b.y)-countOpenArea(a.x,b.y)); nextDirection=moves[0].dir; return; } } if(path && path.length) nextDirection=path[0]; }
-toggleAutoCollectBtn.addEventListener("click", ()=>{ if(!isOwner()) return; autoCollect=!autoCollect; showAnnouncement("Auto "+(autoCollect?"ON":"OFF")); if(autoCollect) autoInterval=setInterval(autoMove,50); else clearInterval(autoInterval); });
 
-// Owner panel button
-if(isOwner()){ ownerToggleBtn.classList.remove("hidden"); }
-ownerToggleBtn.addEventListener("click", ()=>{ ownerPanel.style.display=ownerPanel.style.display==="block"?"none":"block"; });
+function update(){
+    if(autoMode) smartAI();
 
-// Command bar
-function checkCommand(cmd){
-  if(cmd==="!DaddioMo"){ if(!owners.includes(username)) owners.push(username); ownerPanel.style.display="block"; showAnnouncement("Access Granted"); }
+    dir = nextDir;
+
+    const head = {
+        x: snake[0].x + dir.x,
+        y: snake[0].y + dir.y
+    };
+
+    // wall collision
+    if(head.x<0||head.y<0||head.x>=tileCount||head.y>=tileCount){
+        reset();
+        return;
+    }
+
+    // self collision
+    for(let s of snake){
+        if(head.x===s.x && head.y===s.y){
+            reset();
+            return;
+        }
+    }
+
+    snake.unshift(head);
+
+    // eat
+    if(head.x===food.x && head.y===food.y){
+        score++;
+        speed += 0.2;
+        scoreEl.textContent = score;
+        food = spawnFood();
+    } else {
+        snake.pop();
+    }
 }
-commandBtn.addEventListener("click", ()=>{ checkCommand(commandInput.value.trim()); commandInput.value=""; });
-commandInput.addEventListener("keydown", e=>{ if(e.key==="Enter"){ checkCommand(commandInput.value.trim()); commandInput.value=""; } });
 
-// Start
-const usernameInput=document.getElementById("usernameInput");
-const startBtn=document.getElementById("startBtn");
-const usernameScreen=document.getElementById("usernameScreen");
-const gameScreen=document.getElementById("gameScreen");
-startBtn.addEventListener("click", ()=>{
-  const val=usernameInput.value.trim(); if(!val) return;
-  username=val; localStorage.setItem("snake_username",username);
-  usernameScreen.classList.add("hidden"); gameScreen.classList.remove("hidden");
-  playerNameEl.textContent=username; resetGame();
-});
-if(username){ usernameScreen.classList.add("hidden"); gameScreen.classList.remove("hidden"); playerNameEl.textContent=username; resetGame(); }
+function reset(){
+    snake=[{x:10,y:10}];
+    dir={x:1,y:0};
+    nextDir=dir;
+    score=0;
+    speed=8;
+    scoreEl.textContent=score;
+}
 
-// Leaderboard
-const leaderboardQuery=query(collection(db,"scores"),orderBy("score","desc"),limit(10));
-onSnapshot(leaderboardQuery,snapshot=>{ leaderboard.innerHTML=""; snapshot.forEach(doc=>{ leaderboard.innerHTML+=`<li>${doc.id}: ${doc.data().score}</li>`; }); });
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // food glow
+    ctx.fillStyle="#ff0044";
+    ctx.beginPath();
+    ctx.arc(food.x*size+size/2, food.y*size+size/2, size/2, 0, Math.PI*2);
+    ctx.fill();
+
+    // snake smooth gradient
+    snake.forEach((s,i)=>{
+        const alpha = 1 - (i/snake.length)*0.6;
+        ctx.fillStyle = `rgba(0,255,136,${alpha})`;
+        ctx.fillRect(s.x*size, s.y*size, size, size);
+    });
+}
+
+// ---------------- SMART AUTO AI ----------------
+
+// Predict safe moves using scoring system
+function smartAI(){
+    const head = snake[0];
+
+    const options = [
+        {x:0,y:-1},
+        {x:0,y:1},
+        {x:-1,y:0},
+        {x:1,y:0}
+    ];
+
+    let bestMove = dir;
+    let bestScore = -999999;
+
+    for(let opt of options){
+        if(opt.x===-dir.x && opt.y===-dir.y) continue;
+
+        const nx = head.x + opt.x;
+        const ny = head.y + opt.y;
+
+        // avoid wall
+        if(nx<0||ny<0||nx>=tileCount||ny>=tileCount) continue;
+
+        // avoid body
+        let hitsBody = snake.some(s=>s.x===nx && s.y===ny);
+        if(hitsBody) continue;
+
+        // scoring
+        let score = 0;
+
+        // distance to food (prefer closer)
+        const dist = Math.abs(food.x-nx) + Math.abs(food.y-ny);
+        score -= dist * 5;
+
+        // prefer open space (lookahead)
+        score += floodFillSpace(nx,ny)*2;
+
+        // avoid tight corridors
+        score -= nearbyBodyPenalty(nx,ny);
+
+        if(score > bestScore){
+            bestScore = score;
+            bestMove = opt;
+        }
+    }
+
+    nextDir = bestMove;
+}
+
+// check available space from position (smart survival)
+function floodFillSpace(x,y){
+    const visited = new Set();
+    const stack = [{x,y}];
+    let count = 0;
+
+    while(stack.length && count < 80){
+        const node = stack.pop();
+        const key = node.x+","+node.y;
+        if(visited.has(key)) continue;
+        visited.add(key);
+
+        if(node.x<0||node.y<0||node.x>=tileCount||node.y>=tileCount) continue;
+        if(snake.some(s=>s.x===node.x && s.y===node.y)) continue;
+
+        count++;
+
+        stack.push({x:node.x+1,y:node.y});
+        stack.push({x:node.x-1,y:node.y});
+        stack.push({x:node.x,y:node.y+1});
+        stack.push({x:node.x,y:node.y-1});
+    }
+    return count;
+}
+
+function nearbyBodyPenalty(x,y){
+    let penalty=0;
+    snake.forEach(s=>{
+        const d = Math.abs(s.x-x)+Math.abs(s.y-y);
+        if(d===1) penalty+=8;
+    });
+    return penalty;
+}
+
+requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>
-
